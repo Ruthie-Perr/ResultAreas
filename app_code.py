@@ -233,7 +233,7 @@ with st.sidebar:
 
     ex_file = None
     if source == "Upload file":
-        ex_file = st.file_uploader("Excel with examples", type=["xlsx", "xls"])
+        ex_file = st.file_uploader("Resultaatgebieden Excel", type=["xlsx", "xls"])
 
     # Optional: read token from secrets for private repos
     gh_token = st.secrets.get("GITHUB_TOKEN", None)
