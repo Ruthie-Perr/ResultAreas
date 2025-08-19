@@ -1,12 +1,22 @@
 # app.py
-# app.py
+# ---- SQLite shim (must be first) ----
+try:
+    import pysqlite3
+    import sys
+    sys.modules["sqlite3"] = pysqlite3
+    sys.modules["sqlite"] = pysqlite3
+except Exception as e:
+    # Optional: print so you see if shim failed
+    print("SQLite shim not active:", e)
+# -------------------------------------
+
 import os
 import re
 import json
 import streamlit as st
 import pandas as pd
-#import chromadb
-#from chromadb.config import Settings
+import chromadb
+from chromadb.config import Settings
 from typing import List, Dict, Tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
