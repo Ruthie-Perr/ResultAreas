@@ -55,7 +55,7 @@ def load_vectorstore(persist_dir: str, collection_name: str):
     )
     
     vs = Chroma(
-        client=client
+        client=client,
         collection_name=collection_name,
         embedding_function=emb,
     )
