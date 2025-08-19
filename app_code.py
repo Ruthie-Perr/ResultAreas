@@ -5,6 +5,7 @@ import re
 import json
 import streamlit as st
 import pandas as pd
+import pysqlite3
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Tuple
