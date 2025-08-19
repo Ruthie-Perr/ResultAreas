@@ -61,6 +61,10 @@ tiktoken>=0.5.1
 rank-bm25==0.2.2
 PyPDF2==3.0.1
 openpyxl==3.1.5
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-openai>=0.1.0
+
 
 
 
