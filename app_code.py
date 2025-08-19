@@ -48,9 +48,15 @@ def build_query(function_title: str, description: str) -> str:
 def load_vectorstore(persist_dir: str, collection_name: str):
     """Load the persisted Chroma collection with the same embedding model used to build it."""
     emb = OpenAIEmbeddings(model=EMBED_MODEL)  # uses OPENAI_API_KEY from env
+
+    client = chromadb.PersistentClient(
+    path="chroma_db",
+    settings=Settings(chroma_db_impl="duckdb+parquet")
+    )
+    
     vs = Chroma(
+        client=client
         collection_name=collection_name,
-        persist_directory=persist_dir,
         embedding_function=emb,
     )
     return vs
