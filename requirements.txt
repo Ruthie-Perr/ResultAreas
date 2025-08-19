@@ -65,6 +65,8 @@ langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-openai>=0.1.0
 chromadb>=0.5.0
+duckdb>=0.10.0
+
 
 
 
