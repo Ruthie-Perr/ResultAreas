@@ -5,6 +5,7 @@ import re
 import json
 import streamlit as st
 import pandas as pd
+import chromadb
 from typing import List, Dict, Tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
