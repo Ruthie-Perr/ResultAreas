@@ -1,22 +1,9 @@
 # app.py
-# ---- SQLite shim (must be first) ----
-try:
-    import pysqlite3
-    import sys
-    sys.modules["sqlite3"] = pysqlite3
-    sys.modules["sqlite"] = pysqlite3
-except Exception as e:
-    # Optional: print so you see if shim failed
-    print("SQLite shim not active:", e)
-# -------------------------------------
-
 import os
 import re
 import json
 import streamlit as st
 import pandas as pd
-import chromadb
-from chromadb.config import Settings
 from typing import List, Dict, Tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -36,7 +23,7 @@ st.set_page_config(page_title="Result Areas Retriever", layout="wide")
 st.title("Role → Result Areas (Retriever)")
 
 st.caption(
-    "Processing"
+    "Generating..."
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -60,15 +47,9 @@ def build_query(function_title: str, description: str) -> str:
 def load_vectorstore(persist_dir: str, collection_name: str):
     """Load the persisted Chroma collection with the same embedding model used to build it."""
     emb = OpenAIEmbeddings(model=EMBED_MODEL)  # uses OPENAI_API_KEY from env
-
-    client = chromadb.PersistentClient(
-    path="chroma_db",
-    settings=Settings(chroma_db_impl="duckdb+parquet")
-    )
-    
     vs = Chroma(
-        client=client,
         collection_name=collection_name,
+        persist_directory=persist_dir,
         embedding_function=emb,
     )
     return vs
