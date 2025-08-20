@@ -1,6 +1,6 @@
-# app.py — Result Areas Generator (Retriever + LLM)
+# app.py — Result Areas Generator (zonder JSON, met vaste voorbeelden-tabel)
 
-# --- SQLite shim for Streamlit Cloud (Chromadb needs sqlite >= 3.35) ---
+# --- SQLite shim voor Streamlit Cloud (Chromadb vereist sqlite >= 3.35) ---
 import sys
 try:
     import pysqlite3
@@ -8,7 +8,7 @@ try:
 except ImportError:
     pass
 
-import os, re, json
+import os, re
 from typing import List, Dict
 
 import streamlit as st
@@ -21,16 +21,16 @@ from langchain_community.vectorstores import Chroma
 PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
 EMBED_MODEL     = "text-embedding-3-small"
-GEN_MODEL       = "gpt-4o-mini"
+GEN_MODEL       = "gpt-4o-mini"  # of "gpt-4o" / "gpt-4.1-mini"
 
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Result Areas Generator", layout="wide")
-st.title("Role → Result Areas (Generator)")
-st.caption("Voer functietitel en -omschrijving in. Ik haal voorbeelden op en genereer thema’s & resultaatgebieden inclusief AEM-Cube band-scores (0–100).")
+st.title("Role → Resultaatgebieden (Generator)")
+st.caption("Voer functietitel en -omschrijving in. Ik haal voorbeelden op en genereer thema’s & resultaatgebieden inclusief AEM‑Cube positie (alleen buckets).")
 
-# ── Load vectorstore ─────────────────────────────────────────────────
+# ── Vectorstore laden ─────────────────────────────────────────────────
 @st.cache_resource
 def load_vs() -> Chroma:
     emb = OpenAIEmbeddings(model=EMBED_MODEL)
@@ -43,10 +43,10 @@ def load_vs() -> Chroma:
 try:
     vs = load_vs()
 except Exception as e:
-    st.error(f"Failed to load Chroma collection. Error: {e}")
+    st.error(f"Kon Chroma-collectie niet laden. Controleer map '{PERSIST_DIR}' en collection name. Fout: {e}")
     st.stop()
 
-# ── Retrieval helper ─────────────────────────────────────────────────
+# ── Retrieval helper (Chroma 0.5+ filters) ───────────────────────────
 def retrieve_examples(
     vs: Chroma,
     query_text: str,
@@ -80,72 +80,53 @@ def retrieve_examples(
             "band_exploration": md.get("band_exploration", ""),
             "band_managing_complexity": md.get("band_managing_complexity", ""),
             "source": md.get("source", ""),
-            "snippet": d.page_content,
+            "snippet": d.page_content,  # context voor few-shot
         })
     return out
 
-# ── Prompt pieces ────────────────────────────────────────────────────
+# ── Theorie & schrijfregels ──────────────────────────────────────────
 THEORY = """AEM-Cube theory:
-- Attachment: security via people vs content.
-- Exploration: innovate vs optimise (growth-curve: early=explore, late=optimise).
-- Managing Complexity: specialists vs generalists.
-"""
+- Attachment: veiligheid via mensen (relaties) vs inhoud (systemen/ideeën).
+- Exploration: innoveren vs optimaliseren (growth-curve: vroeg = exploreren, later = optimaliseren).
+- Managing Complexity: specialisten (diepte) vs generalisten (breedte)."""
 
-HOW_TO_RA_NL = """Hoe definieer je resultaatgebieden:
-- 3–6 per functie; essentieel, niet “nice-to-have”.
-- Proces met begin en eind, werkwoorden die iets opleveren.
-- Concreet en begrijpelijk resultaat, met waarom erbij.
-"""
+HOW_TO_RA_NL = """Resultaatgebieden:
+- 3–6 per functie; essentieel, door één individu uitvoerbaar.
+- Proces met begin en eind; gebruik werkwoorden die iets opleveren/creëren.
+- Eén zin die het **wat** én het **waarom** combineert (concreet en begrijpelijk).
+- Voorbeeld (goed): “transparante rekeningen leveren **zodat** we een tevreden klantenbasis opbouwen.”"""
 
-def bucket_for(score: int) -> str:
-    s = max(0, min(100, int(score)))
-    if s <= 25: return "0-25"
-    if s <= 50: return "25-50"
-    if s <= 75: return "50-75"
-    return "75-100"
-
+# ── Prompt bouw ──────────────────────────────────────────────────────
 def build_system_msg() -> str:
-    return f"""You are an HR/Org design assistant. Use AEM-Cube theory and the writing rules below to propose themes and resultaatgebieden.
-Return 3–6 resultaatgebieden. Each result area must be outcome-oriented, concrete, and include a short 'why' rationale.
-Also estimate AEM-Cube band widths (Attachment, Exploration, Managing Complexity) that best fit each result area.
-Prefer Dutch if language='nl'.
+    # Let op: alleen buckets, geen numerieke scores.
+    return f"""Je bent een HR/Org design assistent. Gebruik de AEM‑Cube theorie en onderstaande schrijfregels om thema’s en resultaatgebieden voor een functie te formuleren.
+Geef 3–6 resultaatgebieden. Elk resultaatgebied moet **exact één zin** zijn waarin het **wat** en het **waarom** geïntegreerd zijn.
+Geef daarnaast per resultaatgebied de **AEM‑Cube positie** (alleen buckets) voor Attachment, Exploration en Managing Complexity.
 
-AEM-Cube band rules:
-- Each dimension has a score 0–100.
-- Provide both a numeric score and a bucket ["0-25","25-50","50-75","75-100"].
-- Bucket must match the score.
+BELANGRIJKE PRINCIPES
+- Prioriteit bij onderbouwing: (1) Functiecontext van de gebruiker, (2) Opgehaalde voorbeelden, (3) Theorie.
+- Gebruik de voorbeelden als leidraad/inspiratie; herformuleer passend bij de functiecontext. Kopieer geen zinnen letterlijk.
+- Geef 3–6 resultaatgebieden. Elk resultaatgebied is **exact één zin** met wat + waarom.
+- Geef per resultaatgebied de **AEM‑Cube positie** als buckets (A/E/M) met **exact één** uit: "0-25", "25-50", "50-75", "75-100". Geen numerieke scores.
+
 
 THEORY
 {THEORY}
 
-WRITING RULES (NL)
+SCHRIJFREGELS (NL)
 {HOW_TO_RA_NL}
 
-OUTPUT FORMAT:
-1) Markdown for humans (in Dutch if language='nl').
-2) JSON with structure:
-{{
-  "themes": [
-    {{
-      "theme": "<string>",
-      "result_areas": [
-        {{
-          "title": "<kort resultaatgebied>",
-          "why": "<rationale>",
-          "bands": {{
-            "attachment": {{ "score": <0-100>, "bucket": "…" }},
-            "exploration": {{ "score": <0-100>, "bucket": "…" }},
-            "managing_complexity": {{ "score": <0-100>, "bucket": "…" }}
-          }}
-        }}
-      ]
-    }}
-  ]
-}}
-"""
+UITVOERFORMAAT (alleen Markdown, geen JSON):
+Voor elk **thema**:
+- Zet de themanaam als subtitel.
+- Geef daaronder 3–6 bullets, ieder met:
+  • **Resultaatgebied**: één zin met wat + waarom.  
+  • **AEM‑Cube positie**: A=…, E=…, M=… (met alleen een bucket per dimensie).
+Schrijf in het Nederlands als language='nl'."""
 
 def build_examples_block(examples: List[Dict]) -> str:
-    if not examples: return "(none found)"
+    if not examples:
+        return "(geen voorbeelden gevonden)"
     lines = []
     for ex in examples[:8]:
         line = (
@@ -157,71 +138,50 @@ def build_examples_block(examples: List[Dict]) -> str:
         )
         if ex.get("function_title"):
             line += f" | Functie: {ex['function_title']}"
+        if ex.get("source"):
+            line += f" | Bron: {ex['source']}"
         lines.append(line)
-    return "Relevant examples (use as inspiration):\n" + "\n".join(lines)
+    return "Relevante voorbeelden (ter inspiratie, pas aan indien passend):\n" + "\n".join(lines)
 
-def generate_result_areas(role_title: str, role_desc: str, examples: List[Dict], language: str = "nl") -> Dict:
+def generate_result_areas(role_title: str, role_desc: str, examples: List[Dict], language: str = "nl") -> str:
     examples_block = build_examples_block(examples)
     role_text = f"Functietitel: {role_title}\nOmschrijving: {role_desc}"
 
     system_msg = build_system_msg()
     user_msg = f"""Language: {language}
 
-User function / role context:
+Functiecontext:
 \"\"\"{role_text.strip()}\"\"\"
 
+OPGEHAALDE VOORBEELDEN — TE GEBRUIKEN ALS INSPIRATIE (herformuleer passend, niet letterlijk kopiëren):
 {examples_block}
 
-Task:
-- Base your proposal on BOTH the user role and the retrieved examples.
-- Propose 3–6 resultaatgebieden.
-- Include: short why + A/E/M score (0–100) and correct bucket.
-- Output in Dutch (if language='nl')."""
+Taak:
+- Baseer je voorstel op **zowel** de functiecontext **als** de opgehaalde voorbeelden.
+- Maak per **thema** 3–6 resultaatgebieden (één zin elk; wat + waarom).
+- Voeg per resultaatgebied de **AEM‑Cube positie** toe als buckets: A=0-25|25-50|50-75|75-100, E=…, M=….
+- Schrijf compact en concreet, in het Nederlands."""
 
     llm = ChatOpenAI(model=GEN_MODEL, temperature=0.2)
-    resp = llm.invoke([{"role": "system", "content": system_msg},
-                       {"role": "user", "content": user_msg}])
+    resp = llm.invoke([
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_msg},
+    ])
+    return resp.content
 
-    text = resp.content
-
-    json_obj = None
-    json_match = re.search(r"\{[\s\S]*\}\s*$", text.strip())
-    if json_match:
-        try:
-            json_obj = json.loads(json_match.group(0))
-        except Exception:
-            pass
-
-    if isinstance(json_obj, dict):
-        for th in json_obj.get("themes", []):
-            for ra in th.get("result_areas", []):
-                for dim in ["attachment","exploration","managing_complexity"]:
-                    b = ra.get("bands", {}).get(dim, {})
-                    try: sc = int(b.get("score", 0))
-                    except: sc = 0
-                    sc = max(0, min(100, sc))
-                    b["score"] = sc
-                    b["bucket"] = bucket_for(sc)
-
-    return {
-        "markdown": text,
-        "json": json_obj,
-        "prompt": system_msg + "\n\n---\n\n" + user_msg,
-        "examples_block": examples_block,
-    }
-
-# ── UI with two fields (title + description) ─────────────────────────
+# ── UI (titel + omschrijving) ────────────────────────────────────────
 with st.form("ra_form"):
     role_title = st.text_input("Functietitel", placeholder="Bijv. Accountmanager B2B SaaS")
-    role_desc = st.text_area("Functieomschrijving", height=180,
-                             placeholder="Beschrijf de scope, taken, verantwoordelijkheden…")
+    role_desc = st.text_area(
+        "Functieomschrijving",
+        height=180,
+        placeholder="Beschrijf kort de scope, taken en verantwoordelijkheden…"
+    )
     col1, col2 = st.columns([1,1])
     with col1:
         k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=20, value=8)
     with col2:
         language = st.selectbox("Taal", ["nl", "en"], index=0)
-    show_prompt = st.checkbox("Toon prompt/debug", value=False)
-    show_examples_block = st.checkbox("Toon voorbeelden die naar het model zijn gestuurd", value=True)
     submitted = st.form_submit_button("Genereer resultaatgebieden")
 
 if submitted:
@@ -229,22 +189,15 @@ if submitted:
         st.warning("Vul functietitel en/of omschrijving in.")
         st.stop()
 
-    with st.spinner("Retrieving voorbeelden en genereren…"):
+    with st.spinner("Voorbeelden ophalen en genereren…"):
         query_text = f"{role_title} {role_desc}"
         examples = retrieve_examples(vs, query_text, k=int(k))
-        result = generate_result_areas(role_title, role_desc, examples, language=language)
+        markdown = generate_result_areas(role_title, role_desc, examples, language=language)
 
     st.markdown("### Resultaat")
-    st.write(result["markdown"])
+    st.write(markdown)
 
-    if result["json"] is not None:
-        st.download_button(
-            "Download JSON",
-            data=json.dumps(result["json"], ensure_ascii=False, indent=2),
-            file_name="result_areas.json",
-            mime="application/json",
-        )
-
+    # Altijd de opgehaalde voorbeelden als tabel tonen (wat we hebben gebruikt)
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
         ex_df = pd.DataFrame(examples)[[
@@ -254,13 +207,6 @@ if submitted:
         ]]
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
-        st.info("Geen voorbeelden gevonden.")
+        st.info("Geen voorbeelden gevonden voor deze query.")
 
-    if show_examples_block:
-        with st.expander("📎 Voorbeelden naar model (exacte tekst)"):
-            st.code(result["examples_block"], language="markdown")
-
-    if show_prompt:
-        with st.expander("🛠 Prompt (debug)"):
-            st.code(result["prompt"], language="markdown")
 
