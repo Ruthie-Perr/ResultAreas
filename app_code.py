@@ -32,17 +32,18 @@ st.set_page_config(page_title="Result Areas Generator", layout="wide")
 from PIL import Image
 
 def show_header():
-    col1, col2 = st.columns([8, 1])
+    col1, col2 = st.columns([8, 2])  # give the logo a bit more space
     with col1:
         st.title("Resultaatgebieden (Generator)")
     with col2:
         try:
             logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")
-            st.image(logo, width=100)
+            st.image(logo, width=180)   # was 100 → now 180
         except Exception:
             pass
 
 show_header()
+
 
 # ── Vectorstore laden ─────────────────────────────────────────────────
 @st.cache_resource
