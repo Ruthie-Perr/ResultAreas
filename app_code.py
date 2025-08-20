@@ -65,12 +65,14 @@ html, body {
   z-index: 10000;
 }
 
-/* Typography */
-html, body, [class^="css"]  {
-  color: var(--hi-text);
-  font-family: var(--hi-font);
+
+/* Typography: force charcoal text */
+html, body, .stApp, .stAppViewContainer, .main, .block-container, 
+h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
+  color: #222222 !important;
+  font-family: 'Museo Sans', 'Source Sans 3', sans-serif !important;
 }
-h1, h2, h3, h4, h5, h6 { color: var(--hi-text); }
+
 
 /* Inputs: pure white */
 .stTextInput > div > div > input,
@@ -83,14 +85,19 @@ h1, h2, h3, h4, h5, h6 { color: var(--hi-text); }
 }
 
 /* Button: turquoise */
-.stButton > button {
-  background-color: var(--hi-button) !important;
+.stButton > button, .stButton > button:focus, .stButton > button:active {
+  background-color: #2BA6B5 !important;
   color: #ffffff !important;
   border-radius: 10px !important;
   border: none !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
 }
+
+/* Hover effect */
 .stButton > button:hover {
-  background-color: var(--hi-button-hover) !important;
+  background-color: #2593A0 !important;
+  color: #ffffff !important;
 }
 
 /* Table container white */
