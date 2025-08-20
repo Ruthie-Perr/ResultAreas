@@ -32,14 +32,19 @@ st.set_page_config(page_title="Result Areas Generator", layout="wide")
 
 st.markdown("""
 <style>
-/* ===== BACKGROUND (15% teal wash) ===== */
-html, body { background: #ffffff !important; }
-.stApp, .stAppViewContainer, .main, .block-container { background: transparent !important; }
-.stApp::before{
-  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
-  background: rgba(0, 117, 138, 0.15); /* #00758A @ 15% */
+/* ===== PAGE SCROLL (use browser scrollbar) ===== */
+html, body { height: auto !important; overflow-y: auto !important; }
+.stApp, .stAppViewContainer, .main, .block-container, section.main {
+  height: auto !important; overflow: visible !important; background: transparent !important;
 }
-.stApp > *{ position: relative; z-index: 1; }
+
+/* ===== BACKGROUND (teal wash @15%) placed BEHIND content ===== */
+.stApp { position: relative; }
+.stApp::before{
+  content:""; position: fixed; inset: 0;
+  background: rgba(0, 117, 138, 0.15);  /* #00758A @ 15% */
+  z-index: -1; pointer-events: none;    /* sits under everything */
+}
 
 /* ===== TYPOGRAPHY (charcoal) ===== */
 html, body, .stApp, .stAppViewContainer, .main, .block-container,
@@ -58,20 +63,18 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   border-radius: 10px !important;
 }
 
-/* ===== BUTTONS: KILL THE DARK THEME & GRADIENTS ===== */
-/* Cover all known button targets: classic, new baseButton, kind=*, etc. */
+/* ===== BUTTONS (kill dark theme + gradients, force turquoise) ===== */
 .stButton button,
 [data-testid="stButton"] button,
 button[kind],
 [data-testid^="baseButton"] {
-  all: unset !important;                         /* reset dark theme */
+  all: unset !important;                    /* reset Streamlit styles */
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
 
-  background: #2BA6B5 !important;               /* turquoise */
-  background-image: none !important;            /* kill gradients */
+  background: #2BA6B5 !important;          /* turquoise */
   color: #ffffff !important;
   border: none !important;
   border-radius: 10px !important;
@@ -80,8 +83,6 @@ button[kind],
   font-size: 16px !important;
   box-shadow: none !important;
 }
-
-/* Hover / focus */
 .stButton button:hover,
 [data-testid="stButton"] button:hover,
 button[kind]:hover,
@@ -90,12 +91,10 @@ button[kind]:hover,
 [data-testid="stButton"] button:focus,
 button[kind]:focus,
 [data-testid^="baseButton"]:focus {
-  background: #2593A0 !important;               /* darker teal */
+  background: #2593A0 !important;          /* darker teal hover */
   color: #ffffff !important;
   outline: none !important;
 }
-
-/* Disabled state */
 .stButton button[disabled],
 [data-testid^="baseButton"][disabled],
 button[kind][disabled] {
@@ -103,7 +102,7 @@ button[kind][disabled] {
   cursor: not-allowed !important;
 }
 
-/* ===== NUMBER INPUT STEPPER BUTTONS (+ / -) ===== */
+/* Number input steppers (+ / -) */
 [data-testid="stNumberInput"] button {
   all: unset !important;
   display: inline-flex !important;
@@ -117,9 +116,15 @@ button[kind][disabled] {
 }
 [data-testid="stNumberInput"] button:hover { background: #2593A0 !important; }
 [data-testid="stNumberInput"] svg { fill: #ffffff !important; color: #ffffff !important; }
+
+/* (Optional) white card look for dataframes */
+[data-testid="stDataFrame"] {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: .25rem;
+}
 </style>
 """, unsafe_allow_html=True)
-
 
 
 # ---- Logo + Title row ----
@@ -307,18 +312,8 @@ if submitted:
         markdown = generate_result_areas(role_title, role_desc, examples, language="nl")
 
     st.markdown("### Resultaat")
-    # Scrollable white card for long output
-    st.markdown(
-        f"""
-        <div style="max-height: 600px; overflow-y: auto; padding: 1rem;
-                    background: #ffffff; border-radius: 10px;
-                    border: 1px solid rgba(0,0,0,0.1);
-                    font-family: 'Museo Sans', 'Source Sans 3', sans-serif;">
-            {markdown}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(markdown, unsafe_allow_html=False)
+
 
     # Altijd de opgehaalde voorbeelden als tabel tonen (wat we hebben gebruikt)
     st.markdown("### Opgehaalde voorbeelden (tabel)")
