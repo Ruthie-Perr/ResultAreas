@@ -43,11 +43,17 @@ st.markdown("""
 }
 
 /* App background */
-.stApp, .stAppViewContainer, .main, .block-container {
-  background-color: var(--hi-bg) !important;
+.stApp {
+  background: rgba(0, 117, 138, 0.15) !important; /* #00758A at 15% opacity */
   color: var(--hi-text) !important;
   font-family: var(--hi-font);
 }
+
+/* Keep main container transparent so the light teal shows through */
+.stAppViewContainer, .main, .block-container {
+  background: transparent !important;
+}
+
 
 /* Inputs */
 .stTextInput > div > div > input,
