@@ -178,7 +178,7 @@ with st.form("ra_form"):
         placeholder="Beschrijf kort de scope, taken en verantwoordelijkheden…"
     )
     k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=10, value=4)
-    submitted = st.form_submit_button("Genereer resultaatgebieden")
+    submitted = st.form_submit_button("Formuleer resultaatgebieden")
 
 
 if submitted:
