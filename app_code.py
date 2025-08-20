@@ -27,11 +27,11 @@ if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Result Areas Retriever", layout="wide")
-st.title("Role → Result Areas (Retriever)")
+st.title("Generator Result Areas")
 
-st.caption(
-    "Generating..."
-)
+#st.caption(
+#    "Generating..."
+#)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
