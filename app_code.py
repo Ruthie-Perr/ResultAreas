@@ -84,24 +84,29 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   border-radius: 10px !important;
 }
 
-/* Button: turquoise solid */
-.stButton > button, .stButton > button:focus, .stButton > button:active {
-  background: #2BA6B5 !important;     /* override gradient */
-  background-color: #2BA6B5 !important;
+/* -------- BUTTONS -------- */
+.stButton button,
+[data-testid="stButton"] button {
+  all: unset !important;               /* reset default dark theme */
+  display: inline-block !important;
+  text-align: center !important;
+  cursor: pointer !important;
+
+  background: #2BA6B5 !important;      /* turquoise */
   color: #ffffff !important;
   border-radius: 10px !important;
-  border: none !important;
+  padding: 0.5rem 1rem !important;
   font-weight: 600 !important;
-  box-shadow: none !important;
+  font-size: 16px !important;
+  border: none !important;
 }
 
-/* Hover effect */
-.stButton > button:hover {
+/* Hover */
+.stButton button:hover,
+[data-testid="stButton"] button:hover {
   background: #2593A0 !important;
-  background-color: #2593A0 !important;
   color: #ffffff !important;
 }
-
 
 /* Table container white */
 [data-testid="stDataFrame"] {
