@@ -102,16 +102,16 @@ button[kind]:hover,
 from PIL import Image
 
 def show_header():
-    try:
-        logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")
-        st.markdown(f"""
-            <div class="hi-header">
-                <h1>Resultaatgebieden (Generator)</h1>
-                <img src="data:image/png;base64,{st.image(logo, output_format="PNG").image_to_url()}" width="100">
-            </div>
-        """, unsafe_allow_html=True)
-    except Exception:
+    col1, col2 = st.columns([8, 1])
+    with col1:
         st.markdown("<h1>Resultaatgebieden (Generator)</h1>", unsafe_allow_html=True)
+    with col2:
+        try:
+            logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")
+            st.image(logo, width=100)
+        except Exception:
+            pass
+
 
 show_header()
 
