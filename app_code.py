@@ -32,28 +32,33 @@ st.set_page_config(page_title="Result Areas Generator", layout="wide")
 
 st.markdown("""
 <style>
-/* ===== PAGE SCROLL (use browser scrollbar) ===== */
-html, body { height: auto !important; overflow-y: auto !important; }
-.stApp, .stAppViewContainer, .main, .block-container, section.main {
-  height: auto !important; overflow: visible !important; background: transparent !important;
+/* === Fix page scrolling === */
+html, body, .stApp {
+  height: auto !important;
+  overflow-y: auto !important;
 }
 
-/* ===== BACKGROUND (teal wash @15%) placed BEHIND content ===== */
-.stApp { position: relative; }
-.stApp::before{
-  content:""; position: fixed; inset: 0;
-  background: rgba(0, 117, 138, 0.15);  /* #00758A @ 15% */
-  z-index: -1; pointer-events: none;    /* sits under everything */
+/* === Teal background wash @15% === */
+.stApp {
+  position: relative;
+}
+.stApp::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 117, 138, 0.15);  /* #00758A at 15% */
+  z-index: -1;
+  pointer-events: none;
 }
 
-/* ===== TYPOGRAPHY (charcoal) ===== */
+/* === Typography (charcoal text) === */
 html, body, .stApp, .stAppViewContainer, .main, .block-container,
 h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   color: #222222 !important;
   font-family: 'Museo Sans', 'Source Sans 3', sans-serif !important;
 }
 
-/* ===== INPUTS (pure white) ===== */
+/* === Input boxes (white background) === */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
@@ -63,68 +68,34 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   border-radius: 10px !important;
 }
 
-/* ===== BUTTONS (kill dark theme + gradients, force turquoise) ===== */
+/* === Buttons (turquoise) === */
 .stButton button,
 [data-testid="stButton"] button,
 button[kind],
 [data-testid^="baseButton"] {
-  all: unset !important;                    /* reset Streamlit styles */
+  all: unset !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
 
-  background: #2BA6B5 !important;          /* turquoise */
+  background: #2BA6B5 !important;
   color: #ffffff !important;
-  border: none !important;
   border-radius: 10px !important;
   padding: 0.55rem 1rem !important;
   font-weight: 600 !important;
   font-size: 16px !important;
-  box-shadow: none !important;
 }
 .stButton button:hover,
 [data-testid="stButton"] button:hover,
 button[kind]:hover,
-[data-testid^="baseButton"]:hover,
-.stButton button:focus,
-[data-testid="stButton"] button:focus,
-button[kind]:focus,
-[data-testid^="baseButton"]:focus {
-  background: #2593A0 !important;          /* darker teal hover */
+[data-testid^="baseButton"]:hover {
+  background: #2593A0 !important;
   color: #ffffff !important;
-  outline: none !important;
-}
-.stButton button[disabled],
-[data-testid^="baseButton"][disabled],
-button[kind][disabled] {
-  opacity: 0.5 !important;
-  cursor: not-allowed !important;
-}
-
-/* Number input steppers (+ / -) */
-[data-testid="stNumberInput"] button {
-  all: unset !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 28px !important; height: 28px !important;
-  background: #2BA6B5 !important;
-  color: #ffffff !important;
-  border-radius: 8px !important;
-  border: none !important;
-}
-[data-testid="stNumberInput"] button:hover { background: #2593A0 !important; }
-[data-testid="stNumberInput"] svg { fill: #ffffff !important; color: #ffffff !important; }
-
-/* (Optional) white card look for dataframes */
-[data-testid="stDataFrame"] {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: .25rem;
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ---- Logo + Title row ----
