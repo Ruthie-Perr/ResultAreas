@@ -62,10 +62,19 @@ def retrieve_examples(
     content_type: str = "example"
 ) -> List[Dict]:
     """Vector search with metadata filter; returns list of dicts with theme/result_area/bands."""
+
+    # ✅ New filter syntax for Chroma 0.5+
+    filt = {
+        "$and": [
+            {"app_scope": {"$eq": app_scope}},
+            {"content_type": {"$eq": content_type}},
+        ]
+    }
+
     retriever = vs.as_retriever(
         search_kwargs={
             "k": k,
-            "filter": {"app_scope": app_scope, "content_type": content_type},
+            "filter": filt,
         }
     )
     docs = retriever.get_relevant_documents(query_text)
@@ -89,10 +98,10 @@ def retrieve_examples(
             "band_exploration": md.get("band_exploration", ""),
             "band_managing_complexity": md.get("band_managing_complexity", ""),
             "source": md.get("source", ""),
-            # Include the embedded snippet for debugging if you like:
-            # "snippet": d.page_content,
+            # "snippet": d.page_content,  # optional for debugging
         })
     return out
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UI
