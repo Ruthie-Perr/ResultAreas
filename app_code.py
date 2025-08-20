@@ -296,7 +296,6 @@ with st.form("ra_form"):
     k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=10, value=4)
     submitted = st.form_submit_button("Formuleer resultaatgebieden")
 
-
 if submitted:
     if not role_title.strip() and not role_desc.strip():
         st.warning("Vul functietitel en/of omschrijving in.")
@@ -308,18 +307,30 @@ if submitted:
         markdown = generate_result_areas(role_title, role_desc, examples, language="nl")
 
     st.markdown("### Resultaat")
-    st.write(markdown)
+    # Scrollable white card for long output
+    st.markdown(
+        f"""
+        <div style="max-height: 600px; overflow-y: auto; padding: 1rem;
+                    background: #ffffff; border-radius: 10px;
+                    border: 1px solid rgba(0,0,0,0.1);
+                    font-family: 'Museo Sans', 'Source Sans 3', sans-serif;">
+            {markdown}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Altijd de opgehaalde voorbeelden als tabel tonen (wat we hebben gebruikt)
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
         ex_df = pd.DataFrame(examples)[[
-            "theme","result_area",
-            "band_attachment","band_exploration","band_managing_complexity",
-            "source","function_title"
+            "theme", "result_area",
+            "band_attachment", "band_exploration", "band_managing_complexity",
+            "source", "function_title"
         ]]
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze query.")
+
 
 
