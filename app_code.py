@@ -39,33 +39,44 @@ st.markdown("""
   --hi-font: 'Museo Sans', 'Source Sans 3', sans-serif;
 }
 
-/* 1) Base: keep real background white */
-html, body { background: #FFFFFF !important; }
-
-/* 2) Single translucent overlay (15% of #00758A) painted ONCE */
-.stApp { position: relative; }
-.stApp::before{
-  content: "";
-  position: fixed;          /* cover the whole viewport */
-  inset: 0;
-  background: rgba(0, 117, 138, 0.15);  /* #00758A @ 15% */
-  z-index: 0;
-  pointer-events: none;     /* don't block clicks */
+/* Reset Streamlit theme background to transparent */
+.stApp, .stAppViewContainer, .main, .block-container {
+  background: transparent !important;
 }
 
-/* 3) Make app content sit above the overlay */
-.stApp > * { position: relative; z-index: 1; }
-.stAppViewContainer, .main, .block-container { background: transparent !important; }
+/* White base behind everything */
+html, body {
+  background: #ffffff !important;
+}
 
-/* Typography & colors */
-html, body, [class^="css"]  { color: var(--hi-text); font-family: var(--hi-font); }
+/* Apply overlay ABOVE the black Streamlit layer */
+.stApp::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 117, 138, 0.15);  /* 15% teal */
+  z-index: 9999;                        /* higher than Streamlit defaults */
+  pointer-events: none;
+}
+
+/* Keep text above overlay */
+.stApp > * {
+  position: relative;
+  z-index: 10000;
+}
+
+/* Typography */
+html, body, [class^="css"]  {
+  color: var(--hi-text);
+  font-family: var(--hi-font);
+}
 h1, h2, h3, h4, h5, h6 { color: var(--hi-text); }
 
 /* Inputs: pure white */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
-  background: #FFFFFF !important;
+  background: #ffffff !important;
   color: var(--hi-text) !important;
   border: 1px solid rgba(0,0,0,0.1) !important;
   border-radius: 10px !important;
@@ -78,9 +89,11 @@ h1, h2, h3, h4, h5, h6 { color: var(--hi-text); }
   border-radius: 10px !important;
   border: none !important;
 }
-.stButton > button:hover { background-color: var(--hi-button-hover) !important; }
+.stButton > button:hover {
+  background-color: var(--hi-button-hover) !important;
+}
 
-/* Table container stays white */
+/* Table container white */
 [data-testid="stDataFrame"] {
   background: #ffffff;
   border-radius: 12px;
