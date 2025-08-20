@@ -177,12 +177,9 @@ with st.form("ra_form"):
         height=180,
         placeholder="Beschrijf kort de scope, taken en verantwoordelijkheden…"
     )
-    col1, col2 = st.columns([1,1])
-    with col1:
-        k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=20, value=8)
-    with col2:
-        language = st.selectbox("Taal", ["nl", "en"], index=0)
+    k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=10, value=4)
     submitted = st.form_submit_button("Genereer resultaatgebieden")
+
 
 if submitted:
     if not role_title.strip() and not role_desc.strip():
