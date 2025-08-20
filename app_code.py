@@ -84,8 +84,9 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   border-radius: 10px !important;
 }
 
-/* Button: turquoise */
+/* Button: turquoise solid */
 .stButton > button, .stButton > button:focus, .stButton > button:active {
+  background: #2BA6B5 !important;     /* override gradient */
   background-color: #2BA6B5 !important;
   color: #ffffff !important;
   border-radius: 10px !important;
@@ -96,9 +97,11 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
 
 /* Hover effect */
 .stButton > button:hover {
+  background: #2593A0 !important;
   background-color: #2593A0 !important;
   color: #ffffff !important;
 }
+
 
 /* Table container white */
 [data-testid="stDataFrame"] {
