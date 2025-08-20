@@ -38,62 +38,57 @@ st.markdown("""
   --hi-bg: rgba(var(--hi-bg-rgb), var(--hi-bg-alpha));
   --hi-text: #222222;
   --hi-button: #2BA6B5;        /* turquoise */
-  --hi-button-hover: #2593A0;  /* slightly darker for hover */
-  --hi-font: 'Museo Sans', 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --hi-button-hover: #2593A0;  /* darker hover */
+  --hi-font: 'Museo Sans', 'Source Sans 3', sans-serif;
 }
 
-/* Optional Museo Sans webfont (uncomment & host your files in /assets)
-@font-face{
-  font-family: 'Museo Sans';
-  src: url('assets/museo-sans-300.woff2') format('woff2'),
-       url('assets/museo-sans-300.woff') format('woff');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
+/* App background */
+.stApp, .stAppViewContainer, .main, .block-container {
+  background-color: var(--hi-bg) !important;
+  color: var(--hi-text) !important;
+  font-family: var(--hi-font);
 }
-*/
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300&display=swap');
 
-/* Base app styling */
-html, body, [class^="css"]  { font-family: var(--hi-font); color: var(--hi-text); }
-.stApp { background-color: var(--hi-bg); }
-
-/* Keep main container spacing */
-.block-container { padding-top: 0.75rem; }
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 { color: var(--hi-text); letter-spacing: .2px; }
-
-/* Inputs: pure white fields */
+/* Inputs */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
   background-color: #FFFFFF !important;
   color: var(--hi-text) !important;
-  border: 1px solid rgba(0,0,0,0.1) !important;
   border-radius: 10px !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
 }
 
-/* Buttons: turquoise */
+/* Buttons */
 .stButton > button {
   background-color: var(--hi-button) !important;
   color: #ffffff !important;
-  border: 1px solid rgba(0,0,0,0.05) !important;
   border-radius: 10px !important;
+  border: none !important;
 }
 .stButton > button:hover {
   background-color: var(--hi-button-hover) !important;
 }
 
-/* Dataframe container */
+/* Dataframes white cards */
 [data-testid="stDataFrame"] {
   background: #ffffff;
   border-radius: 12px;
   padding: .25rem;
 }
 
-/* Align the logo in the header row to the right */
-.hi-header-right { display: flex; justify-content: flex-end; align-items: center; }
+/* Flex row for header */
+.hi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+.hi-header h1 {
+  margin: 0;
+  color: var(--hi-text);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,20 +97,19 @@ h1, h2, h3, h4, h5, h6 { color: var(--hi-text); letter-spacing: .2px; }
 from PIL import Image
 
 def show_header():
-    left, right = st.columns([8, 1], gap="small")
-    with left:
-        st.markdown("<h1 style='margin-bottom:0'>Resultaatgebieden (Generator)</h1>", unsafe_allow_html=True)
-    with right:
-        try:
-            logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")  # adjust path if needed
-            # No deprecated parameter; just set width
-            st.markdown('<div class="hi-header-right">', unsafe_allow_html=True)
-            st.image(logo, width=96)
-            st.markdown('</div>', unsafe_allow_html=True)
-        except Exception:
-            pass  # silent if missing
+    try:
+        logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")
+        st.markdown(f"""
+            <div class="hi-header">
+                <h1>Resultaatgebieden (Generator)</h1>
+                <img src="data:image/png;base64,{st.image(logo, output_format="PNG").image_to_url()}" width="100">
+            </div>
+        """, unsafe_allow_html=True)
+    except Exception:
+        st.markdown("<h1>Resultaatgebieden (Generator)</h1>", unsafe_allow_html=True)
 
 show_header()
+
 
 
 
