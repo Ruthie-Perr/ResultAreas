@@ -32,90 +32,94 @@ st.set_page_config(page_title="Result Areas Generator", layout="wide")
 
 st.markdown("""
 <style>
-:root{
-  --hi-text: #222222;
-  --hi-button: #2BA6B5;
-  --hi-button-hover: #2593A0;
-  --hi-font: 'Museo Sans', 'Source Sans 3', sans-serif;
+/* ===== BACKGROUND (15% teal wash) ===== */
+html, body { background: #ffffff !important; }
+.stApp, .stAppViewContainer, .main, .block-container { background: transparent !important; }
+.stApp::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background: rgba(0, 117, 138, 0.15); /* #00758A @ 15% */
 }
+.stApp > *{ position: relative; z-index: 1; }
 
-/* Reset Streamlit theme background to transparent */
-.stApp, .stAppViewContainer, .main, .block-container {
-  background: transparent !important;
-}
-
-/* White base behind everything */
-html, body {
-  background: #ffffff !important;
-}
-
-/* Apply overlay ABOVE the black Streamlit layer */
-.stApp::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 117, 138, 0.15);  /* 15% teal */
-  z-index: 9999;                        /* higher than Streamlit defaults */
-  pointer-events: none;
-}
-
-/* Keep text above overlay */
-.stApp > * {
-  position: relative;
-  z-index: 10000;
-}
-
-
-/* Typography: force charcoal text */
-html, body, .stApp, .stAppViewContainer, .main, .block-container, 
+/* ===== TYPOGRAPHY (charcoal) ===== */
+html, body, .stApp, .stAppViewContainer, .main, .block-container,
 h1, h2, h3, h4, h5, h6, p, span, div, label, textarea, input, button {
   color: #222222 !important;
   font-family: 'Museo Sans', 'Source Sans 3', sans-serif !important;
 }
 
-
-/* Inputs: pure white */
+/* ===== INPUTS (pure white) ===== */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
   background: #ffffff !important;
-  color: var(--hi-text) !important;
+  color: #222222 !important;
   border: 1px solid rgba(0,0,0,0.1) !important;
   border-radius: 10px !important;
 }
 
-/* -------- BUTTONS -------- */
+/* ===== BUTTONS: KILL THE DARK THEME & GRADIENTS ===== */
+/* Cover all known button targets: classic, new baseButton, kind=*, etc. */
 .stButton button,
-[data-testid="stButton"] button {
-  all: unset !important;               /* reset default dark theme */
-  display: inline-block !important;
-  text-align: center !important;
+[data-testid="stButton"] button,
+button[kind],
+[data-testid^="baseButton"] {
+  all: unset !important;                         /* reset dark theme */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   cursor: pointer !important;
 
-  background: #2BA6B5 !important;      /* turquoise */
+  background: #2BA6B5 !important;               /* turquoise */
+  background-image: none !important;            /* kill gradients */
   color: #ffffff !important;
+  border: none !important;
   border-radius: 10px !important;
-  padding: 0.5rem 1rem !important;
+  padding: 0.55rem 1rem !important;
   font-weight: 600 !important;
   font-size: 16px !important;
+  box-shadow: none !important;
+}
+
+/* Hover / focus */
+.stButton button:hover,
+[data-testid="stButton"] button:hover,
+button[kind]:hover,
+[data-testid^="baseButton"]:hover,
+.stButton button:focus,
+[data-testid="stButton"] button:focus,
+button[kind]:focus,
+[data-testid^="baseButton"]:focus {
+  background: #2593A0 !important;               /* darker teal */
+  color: #ffffff !important;
+  outline: none !important;
+}
+
+/* Disabled state */
+.stButton button[disabled],
+[data-testid^="baseButton"][disabled],
+button[kind][disabled] {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ===== NUMBER INPUT STEPPER BUTTONS (+ / -) ===== */
+[data-testid="stNumberInput"] button {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important; height: 28px !important;
+  background: #2BA6B5 !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
   border: none !important;
 }
-
-/* Hover */
-.stButton button:hover,
-[data-testid="stButton"] button:hover {
-  background: #2593A0 !important;
-  color: #ffffff !important;
-}
-
-/* Table container white */
-[data-testid="stDataFrame"] {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: .25rem;
-}
+[data-testid="stNumberInput"] button:hover { background: #2593A0 !important; }
+[data-testid="stNumberInput"] svg { fill: #ffffff !important; color: #ffffff !important; }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ---- Logo + Title row ----
