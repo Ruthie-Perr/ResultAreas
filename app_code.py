@@ -305,7 +305,7 @@ if submitted:
     with st.spinner("Voorbeelden ophalen en genereren…"):
         query_text = f"{role_title} {role_desc}"
         examples = retrieve_examples(vs, query_text, k=int(k))
-        markdown = generate_result_areas(role_title, role_desc, examples, language=language)
+        markdown = generate_result_areas(role_title, role_desc, examples, language="nl")
 
     st.markdown("### Resultaat")
     st.write(markdown)
