@@ -17,6 +17,7 @@ import pandas as pd
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 
+
 # ── CONFIG ─────────────────────────────────────────────────────────────
 PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
@@ -26,8 +27,98 @@ GEN_MODEL       = "gpt-4o-mini"  # of "gpt-4o" / "gpt-4.1-mini"
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
+
 st.set_page_config(page_title="Result Areas Generator", layout="wide")
-st.title("Generator Resultaatgebieden")
+
+# ---- Brand styling (CSS) ----
+st.markdown("""
+<style>
+:root{
+  --hi-bg: #178C9E;
+  --hi-text: #222222;
+  --hi-card-bg: #ffffff;
+  --hi-accent: #178C9E;
+  --hi-font: 'Museo Sans', 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* If you have Museo files, uncomment and point to them (put .woff2/.woff in /assets):
+@font-face{
+  font-family: 'Museo Sans';
+  src: url('assets/museo-sans-300.woff2') format('woff2'),
+       url('assets/museo-sans-300.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+
+/* Fallback to Source Sans 3 Light for now */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300&display=swap');
+
+html, body, [class^="css"]  {
+  font-family: var(--hi-font);
+  color: var(--hi-text);
+}
+
+/* App background */
+.stApp {
+  background: var(--hi-bg);
+}
+
+/* Make main containers/cards readable on colored bg */
+.block-container {
+  padding-top: 1.25rem;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2 {
+  color: var(--hi-text);
+  letter-spacing: .2px;
+}
+
+/* Inputs + widgets sit on white cards by default; keep text color consistent */
+.stTextInput > div > div > input,
+.stTextArea textarea,
+.stNumberInput input {
+  color: var(--hi-text) !important;
+}
+
+/* Buttons */
+.stButton button {
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+/* Dataframe tweaks */
+[data-testid="stDataFrame"] {
+  background: var(--hi-card-bg);
+  border-radius: 12px;
+  padding: .25rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---- Logo + Title row ----
+from PIL import Image
+from io import BytesIO
+
+def show_header():
+    col1, col2 = st.columns([1, 8], gap="small")
+    with col1:
+        try:
+            logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")  # or "assets/logo.png"
+            st.image(logo, output_format="PNG", use_column_width=False, width=96)
+        except Exception as e:
+            st.write("")  # silent if missing
+    with col2:
+        st.markdown("<h1 style='margin-bottom:0'>Resultaatgebieden (Generator)</h1>", unsafe_allow_html=True)
+        st.caption("Voer functietitel en -omschrijving in. We halen voorbeelden op en genereren thema’s & resultaatgebieden met AEM‑Cube positie (buckets).")
+
+show_header()
+
+
+
+
 #st.caption("Voer functietitel en -omschrijving in. Ik haal voorbeelden op en genereer thema’s & resultaatgebieden inclusief AEM‑Cube positie (alleen buckets).")
 
 # ── Vectorstore laden ─────────────────────────────────────────────────
