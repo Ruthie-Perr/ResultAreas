@@ -27,8 +27,8 @@ if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Result Areas Generator", layout="wide")
-st.title("Role → Resultaatgebieden (Generator)")
-st.caption("Voer functietitel en -omschrijving in. Ik haal voorbeelden op en genereer thema’s & resultaatgebieden inclusief AEM‑Cube positie (alleen buckets).")
+st.title("Generator Resultaatgebieden")
+#st.caption("Voer functietitel en -omschrijving in. Ik haal voorbeelden op en genereer thema’s & resultaatgebieden inclusief AEM‑Cube positie (alleen buckets).")
 
 # ── Vectorstore laden ─────────────────────────────────────────────────
 @st.cache_resource
