@@ -30,18 +30,19 @@ if "OPENAI_API_KEY" in st.secrets:
 
 st.set_page_config(page_title="Result Areas Generator", layout="wide")
 
-# ---- Brand styling (CSS) ----
 st.markdown("""
 <style>
 :root{
-  --hi-bg: #178C9E;
+  --hi-bg-rgb: 0,117,138;      /* #00758A */
+  --hi-bg-alpha: 0.15;         /* 15% */
+  --hi-bg: rgba(var(--hi-bg-rgb), var(--hi-bg-alpha));
   --hi-text: #222222;
-  --hi-card-bg: #ffffff;
-  --hi-accent: #178C9E;
+  --hi-button: #2BA6B5;        /* turquoise */
+  --hi-button-hover: #2593A0;  /* slightly darker for hover */
   --hi-font: 'Museo Sans', 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* If you have Museo files, uncomment and point to them (put .woff2/.woff in /assets):
+/* Optional Museo Sans webfont (uncomment & host your files in /assets)
 @font-face{
   font-family: 'Museo Sans';
   src: url('assets/museo-sans-300.woff2') format('woff2'),
@@ -51,70 +52,71 @@ st.markdown("""
   font-display: swap;
 }
 */
-
-/* Fallback to Source Sans 3 Light for now */
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300&display=swap');
 
-html, body, [class^="css"]  {
-  font-family: var(--hi-font);
-  color: var(--hi-text);
-}
+/* Base app styling */
+html, body, [class^="css"]  { font-family: var(--hi-font); color: var(--hi-text); }
+.stApp { background-color: var(--hi-bg); }
 
-/* App background */
-.stApp {
-  background: var(--hi-bg);
-}
-
-/* Make main containers/cards readable on colored bg */
-.block-container {
-  padding-top: 1.25rem;
-}
+/* Keep main container spacing */
+.block-container { padding-top: 0.75rem; }
 
 /* Headings */
-h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2 {
-  color: var(--hi-text);
-  letter-spacing: .2px;
-}
+h1, h2, h3, h4, h5, h6 { color: var(--hi-text); letter-spacing: .2px; }
 
-/* Inputs + widgets sit on white cards by default; keep text color consistent */
+/* Inputs: pure white fields */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
+  background-color: #FFFFFF !important;
   color: var(--hi-text) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  border-radius: 10px !important;
 }
 
-/* Buttons */
-.stButton button {
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.05);
+/* Buttons: turquoise */
+.stButton > button {
+  background-color: var(--hi-button) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  border-radius: 10px !important;
+}
+.stButton > button:hover {
+  background-color: var(--hi-button-hover) !important;
 }
 
-/* Dataframe tweaks */
+/* Dataframe container */
 [data-testid="stDataFrame"] {
-  background: var(--hi-card-bg);
+  background: #ffffff;
   border-radius: 12px;
   padding: .25rem;
 }
+
+/* Align the logo in the header row to the right */
+.hi-header-right { display: flex; justify-content: flex-end; align-items: center; }
 </style>
 """, unsafe_allow_html=True)
 
+
 # ---- Logo + Title row ----
 from PIL import Image
-from io import BytesIO
 
 def show_header():
-    col1, col2 = st.columns([1, 8], gap="small")
-    with col1:
-        try:
-            logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")  # or "assets/logo.png"
-            st.image(logo, output_format="PNG", use_column_width=False, width=96)
-        except Exception as e:
-            st.write("")  # silent if missing
-    with col2:
+    left, right = st.columns([8, 1], gap="small")
+    with left:
         st.markdown("<h1 style='margin-bottom:0'>Resultaatgebieden (Generator)</h1>", unsafe_allow_html=True)
-        st.caption("Voer functietitel en -omschrijving in. We halen voorbeelden op en genereren thema’s & resultaatgebieden met AEM‑Cube positie (buckets).")
+    with right:
+        try:
+            logo = Image.open("AEM-Cube_Poster3_HI_Logo.png")  # adjust path if needed
+            # No deprecated parameter; just set width
+            st.markdown('<div class="hi-header-right">', unsafe_allow_html=True)
+            st.image(logo, width=96)
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception:
+            pass  # silent if missing
 
 show_header()
+
 
 
 
