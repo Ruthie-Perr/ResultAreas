@@ -33,67 +33,58 @@ st.set_page_config(page_title="Result Areas Generator", layout="wide")
 st.markdown("""
 <style>
 :root{
-  --hi-bg-rgb: 0,117,138;      /* #00758A */
-  --hi-bg-alpha: 0.15;         /* 15% */
-  --hi-bg: rgba(var(--hi-bg-rgb), var(--hi-bg-alpha));
   --hi-text: #222222;
-  --hi-button: #2BA6B5;        /* turquoise */
-  --hi-button-hover: #2593A0;  /* darker hover */
+  --hi-button: #2BA6B5;
+  --hi-button-hover: #2593A0;
   --hi-font: 'Museo Sans', 'Source Sans 3', sans-serif;
 }
 
-/* App background */
-.stApp {
-  background: rgba(0, 117, 138, 0.15) !important; /* #00758A at 15% opacity */
-  color: var(--hi-text) !important;
-  font-family: var(--hi-font);
+/* 1) Base: keep real background white */
+html, body { background: #FFFFFF !important; }
+
+/* 2) Single translucent overlay (15% of #00758A) painted ONCE */
+.stApp { position: relative; }
+.stApp::before{
+  content: "";
+  position: fixed;          /* cover the whole viewport */
+  inset: 0;
+  background: rgba(0, 117, 138, 0.15);  /* #00758A @ 15% */
+  z-index: 0;
+  pointer-events: none;     /* don't block clicks */
 }
 
-/* Keep main container transparent so the light teal shows through */
-.stAppViewContainer, .main, .block-container {
-  background: transparent !important;
-}
+/* 3) Make app content sit above the overlay */
+.stApp > * { position: relative; z-index: 1; }
+.stAppViewContainer, .main, .block-container { background: transparent !important; }
 
+/* Typography & colors */
+html, body, [class^="css"]  { color: var(--hi-text); font-family: var(--hi-font); }
+h1, h2, h3, h4, h5, h6 { color: var(--hi-text); }
 
-/* Inputs */
+/* Inputs: pure white */
 .stTextInput > div > div > input,
 .stTextArea textarea,
 .stNumberInput input {
-  background-color: #FFFFFF !important;
+  background: #FFFFFF !important;
   color: var(--hi-text) !important;
-  border-radius: 10px !important;
   border: 1px solid rgba(0,0,0,0.1) !important;
+  border-radius: 10px !important;
 }
 
-/* Buttons */
+/* Button: turquoise */
 .stButton > button {
   background-color: var(--hi-button) !important;
   color: #ffffff !important;
   border-radius: 10px !important;
   border: none !important;
 }
-.stButton > button:hover {
-  background-color: var(--hi-button-hover) !important;
-}
+.stButton > button:hover { background-color: var(--hi-button-hover) !important; }
 
-/* Dataframes white cards */
+/* Table container stays white */
 [data-testid="stDataFrame"] {
   background: #ffffff;
   border-radius: 12px;
   padding: .25rem;
-}
-
-/* Flex row for header */
-.hi-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.5rem;
-  margin-bottom: 1rem;
-}
-.hi-header h1 {
-  margin: 0;
-  color: var(--hi-text);
 }
 </style>
 """, unsafe_allow_html=True)
