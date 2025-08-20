@@ -1,4 +1,11 @@
 # app.py
+import sys
+try:
+    import pysqlite3
+    sys.modules["sqlite3"] = pysqlite3
+except ImportError:
+    pass  # fallback if package not available
+
 import os
 import re
 import json
