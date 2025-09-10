@@ -171,7 +171,6 @@ def _parse_theme_line(txt: str):
                 out["M"] = part.split(":", 1)[1].strip()
     return out
 
-@st.cache_resource
 LEVEL_HEADERS = {
     "strategisch": "Strategisch",
     "tactisch": "Tactisch",
@@ -209,6 +208,8 @@ def _clean_theme_name(line: str) -> str:
     s = line.lstrip("-*• ").strip()
     # soms staan er (A/E/M)-hints achter de naam → laat _parse_theme_line dat doen
     return s
+
+@st.cache_resource
 
 def load_themes_from_docx(path: str | Path = THEMES_PATH) -> list[dict]:
     try:
@@ -546,6 +547,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
