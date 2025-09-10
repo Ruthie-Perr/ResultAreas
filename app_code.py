@@ -25,8 +25,7 @@ PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
 EMBED_MODEL     = "text-embedding-3-small"
 GEN_MODEL       = "gpt-4o-mini"  # or "gpt-4o" / "gpt-4.1-mini"
-THEMES_FILENAME = "AEM_Cube_Themas.docx"
-THEMES_PATH = Path(__file__).parent / "data" / THEMES_FILENAME
+THEMES_PATH = Path(__file__).parent / "AEM_Cube_Themas.docx"
 
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -439,4 +438,5 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
