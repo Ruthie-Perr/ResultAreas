@@ -18,13 +18,15 @@ import pandas as pd
 from PIL import Image
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
+from pathlib import Path
 
 # ── CONFIG ─────────────────────────────────────────────────────────────
 PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
 EMBED_MODEL     = "text-embedding-3-small"
 GEN_MODEL       = "gpt-4o-mini"  # or "gpt-4o" / "gpt-4.1-mini"
-THEMES_DOCX_PATH = "/mnt/data/AEM_Cube_Themas.docx"  # provided Word doc
+THEMES_FILENAME = "AEM_Cube_Themas.docx"
+THEMES_PATH = Path(__file__).parent / "data" / THEMES_FILENAME
 
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -171,19 +173,20 @@ def _parse_theme_line(txt: str):
     return out
 
 @st.cache_resource
-def load_themes_from_docx(path: str = THEMES_DOCX_PATH):
+def load_themes_from_docx(path: str | Path = THEMES_PATH):
     try:
         from docx import Document
     except ImportError:
-        st.error("Install `python-docx` in requirements.txt om thema’s uit Word te laden.")
+        st.error("Voeg `python-docx` toe aan requirements.txt om thema’s te kunnen lezen.")
         return []
 
-    try:
-        doc = Document(path)
-    except Exception as e:
-        st.error(f"Kon Word-bestand niet openen: {e}")
+    path = Path(path)
+    if not path.exists():
+        st.error(f"Thema-bestand niet gevonden op {path}. Zorg dat {THEMES_FILENAME} in de repo staat (bijv. in ./data/).")
         return []
 
+    # inlezen
+    doc = Document(str(path))
     lines = []
     for p in doc.paragraphs:
         t = (p.text or "").strip()
@@ -436,3 +439,4 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
