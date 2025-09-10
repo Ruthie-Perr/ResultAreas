@@ -400,7 +400,7 @@ def build_system_msg(selected_themes: List[Dict]) -> str:
         fixed_block = "Geen vaste thema’s gevonden; gebruik je beste inschatting (AEM-Cube)."
 
     return f"""Je bent een HR/Org design assistent. Gebruik AEM-Cube en onderstaande schrijfregels.
-**Voeg géén nieuwe thema’s toe**; werk uitsluitend binnen de opgegeven lijst.
+Je **mag géén nieuwe thema's introduceren**. Gebruik **alleen** de thema's uit ALLOWED_THEMES.
 
 THEORY
 {THEORY}
@@ -547,6 +547,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
