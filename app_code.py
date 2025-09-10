@@ -106,7 +106,7 @@ THEORY = """AEM-Cube theory:
 - Managing Complexity: specialisten (diepte) vs generalisten (breedte)."""
 
 HOW_TO_RA_NL = """Resultaatgebieden:
-- 3–6 per functie; essentieel, door één individu uitvoerbaar.
+- 3–6 per functie; ingedeeld in thema's; essentieel, door één individu uitvoerbaar.
 - Proces met begin en eind; gebruik werkwoorden die iets opleveren/creëren.
 - Eén zin die het **wat** én het **waarom** combineert.
 - Voorbeeld: “transparante rekeningen leveren **zodat** we een tevreden klantenbasis opbouwen.”"""
@@ -114,8 +114,8 @@ HOW_TO_RA_NL = """Resultaatgebieden:
 # ── Prompt bouw ──────────────────────────────────────────────────────
 def build_system_msg() -> str:
     return f"""Je bent een HR/Org design assistent. Gebruik de AEM-Cube theorie en onderstaande schrijfregels om thema’s en resultaatgebieden te formuleren.
-Geef 3–6 resultaatgebieden. Elk in **exact één zin** (wat + waarom).
-Geef daarnaast per resultaatgebied de **AEM-Cube positie** (alleen buckets). 
+Geef de thema's die passen bij de functie, met de daarbij behorende **AEM-Cube positie** (alleen buckets).
+Geef 2–4 resultaatgebieden per thema. Elk in **exact één zin** (wat + waarom).
 
 THEORY
 {THEORY}
@@ -126,9 +126,9 @@ SCHRIJFREGELS (NL)
 UITVOERFORMAAT:
 Voor elk **thema**:
 - Subtitel = themanaam.
-- Daaronder 3–6 bullets:
-  • **Resultaatgebied**: één zin.  
-  • **AEM-Cube positie**: A=…, E=…, M=… (alleen buckets)."""
+  • **AEM-Cube positie**: A=…, E=…, M=… (alleen buckets)  
+- Daaronder 2–4 bullets:
+  • **Resultaatgebied**: één zin."""
 
 def build_examples_block(examples: List[Dict]) -> str:
     if not examples:
