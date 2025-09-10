@@ -404,7 +404,7 @@ if submitted:
         )
 
         # Load AEM themes from Word and auto-select best ones (role + examples), locked to your list
-        all_themes = load_themes_from_docx(THEMES_DOCX_PATH)
+        all_themes = load_themes_from_docx()
         picked = select_themes_for_role_and_examples(
             themes=all_themes,
             role_title=role_title,
@@ -438,5 +438,6 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
