@@ -1,6 +1,7 @@
 {
   "embed_model": "text-embedding-3-small",
   "persist_directory": "chroma_db",
+  "collection_name": "kb_result_areas",
   "total_docs": 70,
   "columns": {
     "Functietitel": "Functietitel",
@@ -10,7 +11,9 @@
     "Resultaatgebied": "Resultaatgebied",
     "Band_A": "Attachment",
     "Band_E": "Exploratie",
-    "Band_M": "Managen van Complexiteit"
+    "Band_M": "Managen van Complexiteit",
+    "OrgType": "OrgType",
+    "Sector": "Sector"
   },
   "tags": {
     "app_scope": "result_areas",
