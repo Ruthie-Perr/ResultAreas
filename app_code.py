@@ -172,21 +172,60 @@ def _parse_theme_line(txt: str):
     return out
 
 @st.cache_resource
-def load_themes_from_docx(path: str | Path = THEMES_PATH):
+LEVEL_HEADERS = {
+    "strategisch": "Strategisch",
+    "tactisch": "Tactisch",
+    "operationeel": "Operationeel",
+    "specialistisch werk": "Specialistisch werk",
+}
+
+def _is_level_header(line: str) -> str | None:
+    norm = _normalize_txt(line)
+    for key, label in LEVEL_HEADERS.items():
+        # exact of begint met (soms staan er haakjes of subtekst)
+        if norm == key or norm.startswith(key):
+            return label
+    return None
+
+def _is_metric_line(line: str) -> tuple[str, str] | None:
+    """
+    Herkent regels als:
+      A: 75-100
+      E: 25–50
+      M: 0-25
+    en retourneert ("A"|"E"|"M", "waarde-raw").
+    """
+    m = re.match(r"^\s*([AEM])\s*:\s*(.+?)\s*$", line, flags=re.IGNORECASE)
+    if not m:
+        return None
+    axis = m.group(1).upper()
+    val  = m.group(2).strip()
+    # normalize en dash/ minus
+    val = val.replace("–", "-").replace("—", "-")
+    return axis, val
+
+def _clean_theme_name(line: str) -> str:
+    # strip bullets en whitespace
+    s = line.lstrip("-*• ").strip()
+    # soms staan er (A/E/M)-hints achter de naam → laat _parse_theme_line dat doen
+    return s
+
+def load_themes_from_docx(path: str | Path = THEMES_PATH) -> list[dict]:
     try:
         from docx import Document
     except ImportError:
-        st.error("Voeg `python-docx` toe aan requirements.txt om thema’s te kunnen lezen.")
+        st.error("Voeg `python-docx` toe aan requirements.txt om thema’s uit Word te lezen.")
         return []
 
     path = Path(path)
     if not path.exists():
-        st.error(f"Thema-bestand niet gevonden op {path}. Zorg dat {THEMES_FILENAME} in de repo staat (bijv. in ./data/).")
+        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo (bijv. ./data/).")
         return []
 
-    # inlezen
     doc = Document(str(path))
-    lines = []
+
+    # 1) alle lijnen uit paragrafen + tabellen verzamelen
+    lines: list[str] = []
     for p in doc.paragraphs:
         t = (p.text or "").strip()
         if t:
@@ -198,29 +237,98 @@ def load_themes_from_docx(path: str | Path = THEMES_PATH):
                 if t:
                     lines.append(t)
 
-    themes, seen = [], set()
-    for ln in lines:
-        raw = ln.lstrip("-*• ").strip()
-        if not raw:
-            continue
-        if len(raw.split()) <= 6 or re.match(r"^[\-\*•]\s+", ln):
-            t = _parse_theme_line(raw)
-            key = _normalize_txt(t["name"])
-            if key and key not in seen:
-                seen.add(key)
-                themes.append(t)
+    # 2) door de lijnen itereren en blokken maken
+    themes: list[dict] = []
+    seen_keys: set[str] = set()
 
-    if not themes:  # fallback
+    current_level: str | None = None
+    i = 0
+    n = len(lines)
+
+    while i < n:
+        raw = lines[i].strip()
+        if not raw:
+            i += 1
+            continue
+
+        # A) level header?
+        lvl = _is_level_header(raw)
+        if lvl:
+            current_level = lvl
+            i += 1
+            continue
+
+        # B) metric-line? (dan hoort dit bij voorafgaande thema – maar als we hier binnenkomen
+        #    zonder thema, slaan we het veilig over)
+        if _is_metric_line(raw):
+            i += 1
+            continue
+
+        # C) anders: kandidaat-thema (korte regel die geen metric is en geen header)
+        #    We laten _parse_theme_line ook eventuele "(A:..., E:..., M:...)" hints oppakken.
+        candidate = _clean_theme_name(raw)
+        # skip te lange alinea's, we willen thematitels (heuristiek)
+        if len(candidate.split()) > 8:
+            i += 1
+            continue
+
+        theme_dict = _parse_theme_line(candidate)  # haalt name en evt hints uit (...)
+        theme_dict.setdefault("name", candidate)
+        if current_level:
+            theme_dict["level"] = current_level
+
+        # D) verzamel A/E/M regels die direct volgen
+        j = i + 1
+        axes = {"A": None, "E": None, "M": None}
+        while j < n:
+            nxt = lines[j].strip()
+            if not nxt:
+                j += 1
+                continue
+            if _is_level_header(nxt):
+                break  # nieuw blok
+            mm = _is_metric_line(nxt)
+            if mm:
+                axis, val = mm
+                axes[axis] = val
+                j += 1
+                continue
+            # volgende thema start als het GEEN metric is en lijkt op een titel
+            # stop dus bij de volgende "candidate-like" lijn
+            # (korte regel, geen dubbele punt aan het begin, geen opsomming van zinnen)
+            looks_like_theme = (len(_clean_theme_name(nxt).split()) <= 8) and (not _is_metric_line(nxt))
+            if looks_like_theme:
+                break
+            j += 1
+
+        # merge axes met eventuele hints uit (...) die _parse_theme_line al gezet kan hebben
+        if axes["A"] and not theme_dict.get("A"): theme_dict["A"] = axes["A"]
+        if axes["E"] and not theme_dict.get("E"): theme_dict["E"] = axes["E"]
+        if axes["M"] and not theme_dict.get("M"): theme_dict["M"] = axes["M"]
+
+        # dedupe op (name, level) genormaliseerd
+        key = f"{_normalize_txt(theme_dict['name'])}||{theme_dict.get('level','')}"
+        if theme_dict["name"] and key not in seen_keys:
+            seen_keys.add(key)
+            themes.append(theme_dict)
+
+        i = j  # ga verder na het thema-blok
+
+    # 3) fallback: als we niets gevonden hebben, gebruik je oude heuristiek nog 1x
+    if not themes:
+        seen = set()
         for ln in lines:
-            raw = (ln or "").strip()
-            if raw:
+            raw = ln.lstrip("-*• ").strip()
+            if not raw:
+                continue
+            if len(raw.split()) <= 6 or re.match(r"^[\-\*•]\s+", ln):
                 t = _parse_theme_line(raw)
-                key = _normalize_txt(t["name"])
+                key = _normalize_txt(t.get("name", ""))
                 if key and key not in seen:
                     seen.add(key)
                     themes.append(t)
-    return themes
 
+    return themes
 def _cos(a, b):
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
 
@@ -438,6 +546,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
