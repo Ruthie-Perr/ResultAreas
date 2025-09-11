@@ -461,29 +461,27 @@ if submitted:
     chosen_org    = org_type_choice if org_type_choice != "(alle)" else None
     chosen_sector = sector_choice   if sector_choice   != "(alle)" else None
 
-   with st.spinner("Voorbeelden ophalen en genereren…"):
-    query_text = f"{role_title} {role_desc}"
-    examples = retrieve_examples(
-        vs,
-        query_text,
-        k=int(k),
-        org_type=chosen_org,
-        sector=chosen_sector
-    )
+    with st.spinner("Voorbeelden ophalen en genereren…"):
+        query_text = f"{role_title} {role_desc}"
+        examples = retrieve_examples(
+            vs,
+            query_text,
+            k=int(k),
+            org_type=chosen_org,
+            sector=chosen_sector
+        )
 
-    # Allowed list = alle thema's uit Word
-    all_themes = load_themes_from_docx()
+        # Allowed list = alle thema's uit Word
+        all_themes = load_themes_from_docx()
 
-    # LLM kiest ZELF het aantal best passende thema's uit allowed list
-    markdown = generate_result_areas(
-        role_title, role_desc, examples,
-        allowed_themes=all_themes,
-        language="nl",
-        org_type=chosen_org,
-        sector=chosen_sector
-    )
-
-
+        # LLM kiest ZELF het aantal best passende thema's uit allowed list
+        markdown = generate_result_areas(
+            role_title, role_desc, examples,
+            allowed_themes=all_themes,
+            language="nl",
+            org_type=chosen_org,
+            sector=chosen_sector
+        )
 
     st.markdown("### Resultaat")
     st.markdown(markdown, unsafe_allow_html=False)
@@ -500,5 +498,6 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
