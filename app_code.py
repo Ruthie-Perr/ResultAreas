@@ -285,8 +285,7 @@ Doel:
 
 Selectierichtlijnen:
 - Kies eerst thema's die de **kern van het werk** in de beschrijving weergeven.
-- Gebruik voorbeelden alleen als **ondersteunende bias**; kopieer niet blind.
-- Vermijd generieke/overkoepelende thema’s **tenzij** de beschrijving ze expliciet maakt.
+- Gebruik voorbeelden als **ondersteuning** bij de keuze van de thema's.
 - Zorg voor **complementariteit**: de gekozen thema’s moeten samen de rol dekken, niet elkaars duplicaat zijn.
 
 ALLOWED_THEMES (met exact te gebruiken A/E/M):
@@ -499,6 +498,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
