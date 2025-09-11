@@ -286,13 +286,13 @@ def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
     return themes
 
 # ── Prompt build (LLM selects themes from allowed list) ───────────────
-def build_system_msg(allowed_themes: List[Dict], top_n: int = 3) -> str:
+def build_system_msg(allowed_themes: List[Dict]) -> str:
     allowed_names = [t["name"] for t in allowed_themes] if allowed_themes else []
     allowed_str = ", ".join(allowed_names) if allowed_names else "(none)"
 
     return f"""Je bent een HR/Org design assistent. 
 Je taak:
-1) Kies **maximaal {top_n} thema's** uitsluitend uit ALLOWED_THEMES die het beste aansluiten op de functiecontext.
+1) Kies het **best passende aantal thema's** (meestal 2–5, maximaal 6) uitsluitend uit ALLOWED_THEMES die het beste aansluiten op de functiecontext.
 2) Formuleer per gekozen thema **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
 3) Geef per resultaatgebied de **AEM-buckets** op (A, E, M) op bucket-niveau (geen exacte percentages).
 
@@ -300,7 +300,7 @@ Selectiecriteria (in volgorde):
 - Match met **functietitel** en **beschrijving** (taken/scope).
 - Relevantie voor **sector** en **organisatietype** (profit/nonprofit) indien opgegeven.
 - Dekkingsgraad in **opgehaalde voorbeelden** (indien aanwezig).
-- Vermijd overlap; kies complementaire thema's.
+- Vermijd overlap; kies complementaire thema's die samen de functie dekken.
 
 AEM THEORY (beknopt)
 - Attachment (A): mens/relatie vs inhoud/systeem
@@ -328,6 +328,7 @@ UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
   ]
 }}
 """
+
 
 def build_examples_block(examples: List[Dict]) -> str:
     if not examples:
@@ -383,7 +384,6 @@ def generate_result_areas(
     language: str = "nl",
     org_type: Optional[str] = None,
     sector: Optional[str] = None,
-    top_n: int = 3,
 ) -> str:
     # 1) Context
     examples_block = build_examples_block(examples)
@@ -393,7 +393,7 @@ def generate_result_areas(
     role_text = "\n".join(ctx)
 
     # 2) Messages
-    system_msg = build_system_msg(allowed_themes, top_n=top_n)
+    system_msg = build_system_msg(allowed_themes)
     user_msg = f"""Language: {language}
 
 Functiecontext:
@@ -403,7 +403,7 @@ Voorbeelden (ter referentie, pas thema-keuze en formuleringen hierop aan):
 {examples_block}
 
 Taak:
-- Kies maximaal {top_n} thema's uit ALLOWED_THEMES die het best passen bij de functie + (optioneel) sector/orgtype.
+- Kies het best passende aantal thema's (meestal 2–5, max 6) uit ALLOWED_THEMES die het best passen bij de functie + (optioneel) sector/orgtype.
 - Per gekozen thema 2–4 resultaatgebieden, elk één zin, met A/E/M buckets (alleen buckets).
 - Retourneer **enkel JSON** volgens het afgesproken schema.
 """
@@ -430,6 +430,7 @@ Taak:
     markdown = _render_markdown_from_struct(data, allowed_names)
     return markdown
 
+
 # ── UI (titel + omschrijving + filters) ──────────────────────────────
 with st.form("ra_form"):
     role_title = st.text_input("Functietitel", placeholder="Bijv. Accountmanager B2B SaaS")
@@ -449,8 +450,6 @@ with st.form("ra_form"):
     org_type_choice = st.selectbox("Organisatietype", ORG_TYPES, index=0)
     sector_choice   = st.selectbox("Sector", SECTORS, index=0)
 
-    # how many themes should the model pick
-    top_n = st.slider("Aantal thema’s te kiezen", 1, 6, 3)
 
     submitted = st.form_submit_button("Formuleer resultaatgebieden")
 
@@ -463,27 +462,27 @@ if submitted:
     chosen_sector = sector_choice   if sector_choice   != "(alle)" else None
 
     with st.spinner("Voorbeelden ophalen en genereren…"):
-        query_text = f"{role_title} {role_desc}"
-        examples = retrieve_examples(
-            vs,
-            query_text,
-            k=int(k),
-            org_type=chosen_org,
-            sector=chosen_sector
-        )
+    query_text = f"{role_title} {role_desc}"
+    examples = retrieve_examples(
+        vs,
+        query_text,
+        k=int(k),
+        org_type=chosen_org,
+        sector=chosen_sector
+    )
 
-        # Load FULL AEM themes from Word (allowed list)
-        all_themes = load_themes_from_docx()
+    # Allowed list = alle thema's uit Word
+    all_themes = load_themes_from_docx()
 
-        # LLM selects the best-fitting themes from the allowed list (no fuzzy, exact names only)
-        markdown = generate_result_areas(
-            role_title, role_desc, examples,
-            allowed_themes=all_themes,
-            language="nl",
-            org_type=chosen_org,
-            sector=chosen_sector,
-            top_n=int(top_n)
-        )
+    # LLM kiest ZELF het aantal best passende thema's uit allowed list
+    markdown = generate_result_areas(
+        role_title, role_desc, examples,
+        allowed_themes=all_themes,
+        language="nl",
+        org_type=chosen_org,
+        sector=chosen_sector
+    )
+
 
     st.markdown("### Resultaat")
     st.markdown(markdown, unsafe_allow_html=False)
@@ -500,3 +499,4 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
