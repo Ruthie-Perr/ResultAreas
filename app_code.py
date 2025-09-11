@@ -261,51 +261,46 @@ def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
 
 # ── Prompt build (LLM selects themes from allowed list) ───────────────
 def build_system_msg(allowed_themes: List[Dict]) -> str:
-    # Toon elke themanaam met de bijbehorende A/E/M uit Word
     def fmt_theme(t):
         name = t.get("name","").strip()
+        lvl  = (t.get("level") or "").strip()
         A = (t.get("A") or "").strip()
         E = (t.get("E") or "").strip()
         M = (t.get("M") or "").strip()
-        hints = []
-        if A: hints.append(f"A: {A}")
-        if E: hints.append(f"E: {E}")
-        if M: hints.append(f"M: {M}")
-        return f"- {name}" + (f" ({', '.join(hints)})" if hints else "")
+        parts = []
+        if lvl: parts.append(lvl)
+        if A: parts.append(f"A: {A}")
+        if E: parts.append(f"E: {E}")
+        if M: parts.append(f"M: {M}")
+        return f"- {name}" + (f" ({', '.join(parts)})" if parts else "")
 
-    allowed_lines = "\n".join(fmt_theme(t) for t in allowed_themes if t.get("name"))
+    allowed_block = "\n".join(fmt_theme(t) for t in allowed_themes if t.get("name"))
 
-    return f"""Je bent een HR/Org design assistent. 
-Je taak:
-1) Kies het **best passende aantal thema's** (meestal 2–5, max 6) **uitsluitend** uit ALLOWED_THEMES.
-2) **Gebruik de themanaam en A/E/M-buckets exact zoals hieronder geschreven** (geen eigen waarden of schattingen).
-3) Formuleer per gekozen thema **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
+    return f"""Je bent een HR/Org design assistent.
 
-Selectiecriteria (in volgorde):
-- Match met **functietitel** en **beschrijving**.
-- Relevantie voor **sector** en **organisatietype** (profit/nonprofit) indien opgegeven.
-- Dekkingsgraad in **opgehaalde voorbeelden**.
-- Vermijd overlap; kies complementaire thema's.
+Doel:
+- Kies **2–6 thema's** die **het beste aansluiten** bij de functiecontext (functietitel + beschrijving), rekening houdend met sector en organisatietype (indien gegeven) en met de opgehaalde voorbeelden.
+- **Gebruik de themanaam en A/E/M-buckets exact zoals hieronder weergegeven**. Geen alternatieve of geschatte waarden.
+- Per gekozen thema: geef **2–4 resultaatgebieden** (elk in **exact één zin**, wat+waarom) en een **korte rationale** (één zinnetje) waarom dit thema past.
 
-AEM THEORY (beknopt)
-- Attachment (A): mens/relatie vs inhoud/systeem
-- Exploration (E): vernieuwen vs optimaliseren
-- Managing Complexity (M): specialistisch vs generalistisch
+Selectierichtlijnen:
+- Kies eerst thema's die de **kern van het werk** in de beschrijving weergeven.
+- Gebruik voorbeelden alleen als **ondersteunende bias**; kopieer niet blind.
+- Vermijd generieke/overkoepelende thema’s **tenzij** de beschrijving ze expliciet maakt.
+- Zorg voor **complementariteit**: de gekozen thema’s moeten samen de rol dekken, niet elkaars duplicaat zijn.
 
-SCHRIJFREGELS (NL)
-- Resultaatgebied = één zin met **wat** + **waarom** (concreet, compact).
+ALLOWED_THEMES (met exact te gebruiken A/E/M):
+{allowed_block}
 
-ALLOWED_THEMES (met **vaste** A/E/M):
-{allowed_lines}
-
-UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
+UITVOERFORMAAT (STRICT JSON — alleen dit object):
 {{
   "themes": [
     {{
-      "name": "<exact uit ALLOWED_THEMES>",
+      "name": "<exacte themanaam uit ALLOWED_THEMES>",
       "A": "<exact uit ALLOWED_THEMES>",
       "E": "<exact uit ALLOWED_THEMES>",
       "M": "<exact uit ALLOWED_THEMES>",
+      "reason": "<korte rationale waarom dit thema past>",
       "result_areas": [
         "<één zin wat+waarom>",
         "<…>"
@@ -314,6 +309,7 @@ UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
   ]
 }}
 """
+
 
 
 
@@ -392,30 +388,27 @@ def generate_result_areas(
     org_type: Optional[str] = None,
     sector: Optional[str] = None,
 ) -> str:
-    # 1) Context
     examples_block = build_examples_block(examples)
     ctx = [f"Functietitel: {role_title}", f"Omschrijving: {role_desc}"]
     if org_type: ctx.append(f"Organisatietype: {org_type}")
     if sector:   ctx.append(f"Sector: {sector}")
     role_text = "\n".join(ctx)
 
-    # 2) Messages
     system_msg = build_system_msg(allowed_themes)
     user_msg = f"""Language: {language}
 
 Functiecontext:
 \"\"\"{role_text.strip()}\"\"\"
 
-Voorbeelden (ter referentie, pas thema-keuze en formuleringen hierop aan):
+Voorbeelden (alleen ter inspiratie/bias — kies wat inhoudelijk past):
 {examples_block}
 
 Taak:
-- Kies het best passende aantal thema's (meestal 2–5, max 6) uit ALLOWED_THEMES die het best passen bij de functie + (optioneel) sector/orgtype.
-- Per gekozen thema 2–4 resultaatgebieden, elk één zin, met A/E/M buckets (alleen buckets).
-- Retourneer **enkel JSON** volgens het afgesproken schema.
+- Kies 2–6 thema’s uit ALLOWED_THEMES (exacte naam en A/E/M).
+- Per thema 2–4 resultaatgebieden (één zin elk) + korte rationale.
+- Retourneer **uitsluitend JSON** volgens het schema.
 """
 
-    # 3) JSON-only response
     llm = ChatOpenAI(
         model=GEN_MODEL,
         temperature=0.2,
@@ -426,7 +419,6 @@ Taak:
         {"role": "user", "content": user_msg},
     ])
 
-
     raw = resp.content or "{}"
     try:
         data = json.loads(raw)
@@ -434,8 +426,10 @@ Taak:
         m = re.search(r"\{.*\}", raw, flags=re.S)
         data = json.loads(m.group(0)) if m else {"themes": []}
 
+    # NB: geef de VOLLEDIGE allowed dicts mee, zodat de renderer canonieke A/E/M kan afdwingen:
     markdown = _render_markdown_from_struct(data, allowed_themes)
     return markdown
+
 
 
 # ── UI (titel + omschrijving + filters) ──────────────────────────────
@@ -505,6 +499,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
