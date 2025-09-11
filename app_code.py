@@ -1,4 +1,4 @@
-# app.py — Result Areas Generator (locked to AEM themes, soft-bias retrieval, single-select filters)
+# app.py — Result Areas Generator (LLM selects themes from allowed list; sector/profit-aware)
 
 # --- SQLite shim for Streamlit Cloud (Chromadb requires sqlite >= 3.35) ---
 import sys
@@ -25,7 +25,7 @@ PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
 EMBED_MODEL     = "text-embedding-3-small"
 GEN_MODEL       = "gpt-4o-mini"  # or "gpt-4o" / "gpt-4.1-mini"
-THEMES_PATH = Path(__file__).parent / "AEM_Cube_Themas.docx"
+THEMES_PATH     = Path(__file__).parent / "AEM_Cube_Themas.docx"
 
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -92,16 +92,16 @@ def retrieve_examples(
     if sector:   bias_bits.append(f"sector: {sector}")
     biased_query = query_text if not bias_bits else (query_text + " | " + " | ".join(bias_bits))
 
-    # Try with hard filters first (if they exist in the KB, great)
+    # Try with hard filters first
     retriever = vs.as_retriever(search_kwargs={"k": k, "filter": {"$and": filt_and}})
     docs = retriever.get_relevant_documents(biased_query)
 
-    # If filters returned nothing but user selected filters, fall back to base filter (soft bias only)
+    # Fallback to base if nothing found
     if not docs and (org_type or sector):
         retriever = vs.as_retriever(search_kwargs={"k": k, "filter": base_filter})
         docs = retriever.get_relevant_documents(biased_query)
 
-    # Optional rerank: boost docs that mention selected org_type/sector in text or metadata
+    # Optional rerank: boost docs that mention selected org_type/sector
     def score_doc(d):
         t = (d.page_content or "") + " " + " ".join(str(v) for v in (d.metadata or {}).values())
         s = 0
@@ -110,7 +110,6 @@ def retrieve_examples(
         if sector and sector.lower() in t.lower():
             s += 1
         return s
-
     if org_type or sector:
         docs.sort(key=score_doc, reverse=True)
 
@@ -119,8 +118,7 @@ def retrieve_examples(
     for d in docs:
         md = d.metadata or {}
         key = (md.get("theme",""), md.get("result_area",""))
-        if key in seen:
-            continue
+        if key in seen: continue
         seen.add(key)
         out.append({
             "function_title": md.get("function_title", ""),
@@ -148,7 +146,7 @@ HOW_TO_RA_NL = """Resultaatgebieden:
 - Eén zin die het **wat** én het **waarom** combineert.
 - Voorbeeld: “transparante rekeningen leveren **zodat** we een tevreden klantenbasis opbouwen.”"""
 
-# ── Theme loading from Word + selection logic ────────────────────────
+# ── Theme loading from Word ───────────────────────────────────────────
 def _normalize_txt(s: str) -> str:
     s = (s or "").strip().lower()
     s = re.sub(r"[^\w\s]", " ", s)
@@ -175,248 +173,161 @@ LEVEL_HEADERS = {
     "strategisch": "Strategisch",
     "tactisch": "Tactisch",
     "operationeel": "Operationeel",
-    "specialistisch werk": "Specialistisch werk",
+    # voeg "specialistisch werk": "Specialistisch werk" toe als je die laag ook gebruikt
 }
 
 def _is_level_header(line: str) -> str | None:
     norm = _normalize_txt(line)
     for key, label in LEVEL_HEADERS.items():
-        # exact of begint met (soms staan er haakjes of subtekst)
         if norm == key or norm.startswith(key):
             return label
     return None
 
-def _is_metric_line(line: str) -> tuple[str, str] | None:
-    """
-    Herkent regels als:
-      A: 75-100
-      E: 25–50
-      M: 0-25
-    en retourneert ("A"|"E"|"M", "waarde-raw").
-    """
+def _is_metric_line(line: str) -> Optional[tuple[str, str]]:
     m = re.match(r"^\s*([AEM])\s*:\s*(.+?)\s*$", line, flags=re.IGNORECASE)
-    if not m:
-        return None
+    if not m: return None
     axis = m.group(1).upper()
-    val  = m.group(2).strip()
-    # normalize en dash/ minus
-    val = val.replace("–", "-").replace("—", "-")
+    val  = m.group(2).strip().replace("–", "-").replace("—", "-")
     return axis, val
 
 def _clean_theme_name(line: str) -> str:
-    # strip bullets en whitespace
-    s = line.lstrip("-*• ").strip()
-    # soms staan er (A/E/M)-hints achter de naam → laat _parse_theme_line dat doen
-    return s
+    return line.lstrip("-*• ").strip()
 
 @st.cache_resource
-
-def load_themes_from_docx(path: str | Path = THEMES_PATH) -> list[dict]:
+def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
     try:
         from docx import Document
     except ImportError:
         st.error("Voeg `python-docx` toe aan requirements.txt om thema’s uit Word te lezen.")
         return []
-
     path = Path(path)
     if not path.exists():
-        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo (bijv. ./data/).")
+        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo (bijv. ./).")
         return []
 
     doc = Document(str(path))
-
-    # 1) alle lijnen uit paragrafen + tabellen verzamelen
-    lines: list[str] = []
+    lines: List[str] = []
     for p in doc.paragraphs:
         t = (p.text or "").strip()
-        if t:
-            lines.append(t)
+        if t: lines.append(t)
     for tbl in getattr(doc, "tables", []):
         for row in tbl.rows:
             for cell in row.cells:
                 t = (cell.text or "").strip()
-                if t:
-                    lines.append(t)
+                if t: lines.append(t)
 
-    # 2) door de lijnen itereren en blokken maken
-    themes: list[dict] = []
+    themes: List[Dict] = []
     seen_keys: set[str] = set()
-
-    current_level: str | None = None
-    i = 0
-    n = len(lines)
+    current_level: Optional[str] = None
+    i, n = 0, len(lines)
 
     while i < n:
         raw = lines[i].strip()
-        if not raw:
-            i += 1
-            continue
+        if not raw: i += 1; continue
 
-        # A) level header?
         lvl = _is_level_header(raw)
         if lvl:
             current_level = lvl
             i += 1
             continue
 
-        # B) metric-line? (dan hoort dit bij voorafgaande thema – maar als we hier binnenkomen
-        #    zonder thema, slaan we het veilig over)
         if _is_metric_line(raw):
             i += 1
             continue
 
-        # C) anders: kandidaat-thema (korte regel die geen metric is en geen header)
-        #    We laten _parse_theme_line ook eventuele "(A:..., E:..., M:...)" hints oppakken.
         candidate = _clean_theme_name(raw)
-        # skip te lange alinea's, we willen thematitels (heuristiek)
         if len(candidate.split()) > 8:
             i += 1
             continue
 
-        theme_dict = _parse_theme_line(candidate)  # haalt name en evt hints uit (...)
+        theme_dict = _parse_theme_line(candidate)
         theme_dict.setdefault("name", candidate)
         if current_level:
             theme_dict["level"] = current_level
 
-        # D) verzamel A/E/M regels die direct volgen
         j = i + 1
         axes = {"A": None, "E": None, "M": None}
         while j < n:
             nxt = lines[j].strip()
-            if not nxt:
-                j += 1
-                continue
-            if _is_level_header(nxt):
-                break  # nieuw blok
+            if not nxt: j += 1; continue
+            if _is_level_header(nxt): break
             mm = _is_metric_line(nxt)
             if mm:
                 axis, val = mm
                 axes[axis] = val
                 j += 1
                 continue
-            # volgende thema start als het GEEN metric is en lijkt op een titel
-            # stop dus bij de volgende "candidate-like" lijn
-            # (korte regel, geen dubbele punt aan het begin, geen opsomming van zinnen)
             looks_like_theme = (len(_clean_theme_name(nxt).split()) <= 8) and (not _is_metric_line(nxt))
-            if looks_like_theme:
-                break
+            if looks_like_theme: break
             j += 1
 
-        # merge axes met eventuele hints uit (...) die _parse_theme_line al gezet kan hebben
         if axes["A"] and not theme_dict.get("A"): theme_dict["A"] = axes["A"]
         if axes["E"] and not theme_dict.get("E"): theme_dict["E"] = axes["E"]
         if axes["M"] and not theme_dict.get("M"): theme_dict["M"] = axes["M"]
 
-        # dedupe op (name, level) genormaliseerd
         key = f"{_normalize_txt(theme_dict['name'])}||{theme_dict.get('level','')}"
         if theme_dict["name"] and key not in seen_keys:
             seen_keys.add(key)
             themes.append(theme_dict)
 
-        i = j  # ga verder na het thema-blok
+        i = j
 
-    # 3) fallback: als we niets gevonden hebben, gebruik je oude heuristiek nog 1x
     if not themes:
         seen = set()
         for ln in lines:
             raw = ln.lstrip("-*• ").strip()
-            if not raw:
-                continue
+            if not raw: continue
             if len(raw.split()) <= 6 or re.match(r"^[\-\*•]\s+", ln):
                 t = _parse_theme_line(raw)
                 key = _normalize_txt(t.get("name", ""))
                 if key and key not in seen:
-                    seen.add(key)
-                    themes.append(t)
+                    seen.add(key); themes.append(t)
 
     return themes
-def _cos(a, b):
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
 
-def _match_to_known_theme(example_theme: str, known_theme_names_norm: List[str]) -> Optional[str]:
-    ex = set(_normalize_txt(example_theme).split())
-    if not ex:
-        return None
-    best, best_score = None, 0.0
-    for k in known_theme_names_norm:
-        kset = set(k.split())
-        j = len(ex & kset) / (len(ex | kset) + 1e-8)
-        if j > best_score:
-            best, best_score = k, j
-    return best if best_score >= 0.34 else None
+# ── Prompt build (LLM selects themes from allowed list) ───────────────
+def build_system_msg(allowed_themes: List[Dict], top_n: int = 3) -> str:
+    allowed_names = [t["name"] for t in allowed_themes] if allowed_themes else []
+    allowed_str = ", ".join(allowed_names) if allowed_names else "(none)"
 
-def select_themes_for_role_and_examples(
-    themes: List[Dict],
-    role_title: str,
-    role_desc: str,
-    examples: List[Dict],
-    top_n: int = 3,
-    alpha: float = 0.7,
-) -> List[Dict]:
-    if not themes:
-        return []
-    names = [t["name"] for t in themes]
-    names_norm = [_normalize_txt(n) for n in names]
+    return f"""Je bent een HR/Org design assistent. 
+Je taak:
+1) Kies **maximaal {top_n} thema's** uitsluitend uit ALLOWED_THEMES die het beste aansluiten op de functiecontext.
+2) Formuleer per gekozen thema **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
+3) Geef per resultaatgebied de **AEM-buckets** op (A, E, M) op bucket-niveau (geen exacte percentages).
 
-    emb = embedder()
-    role_vec = emb.embed_query(f"{role_title} {role_desc}".strip())
-    theme_vecs = emb.embed_documents(names)
+Selectiecriteria (in volgorde):
+- Match met **functietitel** en **beschrijving** (taken/scope).
+- Relevantie voor **sector** en **organisatietype** (profit/nonprofit) indien opgegeven.
+- Dekkingsgraad in **opgehaalde voorbeelden** (indien aanwezig).
+- Vermijd overlap; kies complementaire thema's.
 
-    sims = np.array([_cos(role_vec, v) for v in theme_vecs])
-    if sims.max() > sims.min():
-        sims = (sims - sims.min()) / (sims.max() - sims.min())
-    else:
-        sims = np.ones_like(sims) * 0.5
-
-    counts = np.zeros(len(names))
-    for ex in (examples or []):
-        ex_theme = ex.get("theme") or ""
-        mt = _match_to_known_theme(ex_theme, names_norm)
-        if mt:
-            idx = names_norm.index(mt)
-            counts[idx] += 1
-
-    cov = counts / counts.max() if counts.max() > 0 else counts
-    score = alpha * sims + (1.0 - alpha) * cov
-    order = np.argsort(-score)
-    picked_idx = order[:max(1, top_n)]
-    return [themes[i] for i in picked_idx]
-
-# ── Prompt build (LOCK to selected themes) ────────────────────────────
-def build_system_msg(selected_themes: List[Dict]) -> str:
-    if selected_themes:
-        fixed_lines = []
-        for t in selected_themes:
-            line = f"- {t['name']}"
-            hints = []
-            if t.get("A"): hints.append(f"A={t['A']}")
-            if t.get("E"): hints.append(f"E={t['E']}")
-            if t.get("M"): hints.append(f"M={t['M']}")
-            if hints:
-                line += "  (" + ", ".join(hints) + ")"
-            fixed_lines.append(line)
-        fixed_block = "Gebruik **uitsluitend** deze thema's (géén nieuwe toevoegen):\n" + "\n".join(fixed_lines)
-    else:
-        fixed_block = "Geen vaste thema’s gevonden; gebruik je beste inschatting (AEM-Cube)."
-
-    return f"""Je bent een HR/Org design assistent. Gebruik AEM-Cube en onderstaande schrijfregels.
-Je **mag géén nieuwe thema's introduceren**. Gebruik **alleen** de thema's uit ALLOWED_THEMES.
-
-THEORY
-{THEORY}
+AEM THEORY (beknopt)
+- Attachment (A): mens/relatie vs inhoud/systeem
+- Exploration (E): vernieuwen vs optimaliseren
+- Managing Complexity (M): specialistisch vs generalistisch
 
 SCHRIJFREGELS (NL)
-{HOW_TO_RA_NL}
+- Resultaatgebied = één zin met **wat** + **waarom** (concreet, compact).
 
-THEMA'S (VAST):
-{fixed_block}
+ALLOWED_THEMES: {allowed_str}
 
-UITVOERFORMAAT:
-Voor elk thema:
-- Subtitel = themanaam.
-  • **AEM-Cube positie**: A=…, E=…, M=… (alleen buckets; volg hints indien aanwezig)
-- 2–4 bullets:
-  • **Resultaatgebied**: exact één zin (wat + waarom)."""
+UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
+{{
+  "themes": [
+    {{
+      "name": "<één uit ALLOWED_THEMES>",
+      "A": "<bucket (bijv. 0-25 | 25-50 | 50-75 | 75-100 | hoog/laag)>",
+      "E": "<bucket>",
+      "M": "<bucket>",
+      "result_areas": [
+        "<één zin wat+waarom>",
+        "<…>"
+      ]
+    }}
+  ]
+}}
+"""
 
 def build_examples_block(examples: List[Dict]) -> str:
     if not examples:
@@ -437,41 +348,87 @@ def build_examples_block(examples: List[Dict]) -> str:
         lines.append(line)
     return "Relevante voorbeelden:\n" + "\n".join(lines)
 
+def _render_markdown_from_struct(struct: dict, allowed_names: List[str]) -> str:
+    """Render naar Markdown; alleen exact-allowed thema's worden getoond."""
+    lines = []
+    for item in struct.get("themes", []):
+        name = (item.get("name") or "").strip()
+        if name not in allowed_names:
+            continue  # drop onbekend thema
+
+        A = item.get("A", "")
+        E = item.get("E", "")
+        M = item.get("M", "")
+        ras = [ra for ra in (item.get("result_areas") or []) if isinstance(ra, str) and ra.strip()]
+        if not ras:
+            continue
+
+        lines.append(f"### {name}")
+        aem_bits = []
+        if A: aem_bits.append(f"A={A}")
+        if E: aem_bits.append(f"E={E}")
+        if M: aem_bits.append(f"M={M}")
+        if aem_bits:
+            lines.append("**AEM-Cube positie:** " + ", ".join(aem_bits))
+        for ra in ras[:4]:
+            lines.append(f"- **Resultaatgebied:** {ra.strip()}")
+        lines.append("")
+    return "\n".join(lines).strip() or "_Geen geldige thema’s met resultaatgebieden._"
+
 def generate_result_areas(
     role_title: str,
     role_desc: str,
     examples: List[Dict],
-    selected_themes: List[Dict],
+    allowed_themes: List[Dict],
     language: str = "nl",
     org_type: Optional[str] = None,
     sector: Optional[str] = None,
+    top_n: int = 3,
 ) -> str:
+    # 1) Context
     examples_block = build_examples_block(examples)
     ctx = [f"Functietitel: {role_title}", f"Omschrijving: {role_desc}"]
     if org_type: ctx.append(f"Organisatietype: {org_type}")
     if sector:   ctx.append(f"Sector: {sector}")
     role_text = "\n".join(ctx)
 
-    system_msg = build_system_msg(selected_themes)
+    # 2) Messages
+    system_msg = build_system_msg(allowed_themes, top_n=top_n)
     user_msg = f"""Language: {language}
 
 Functiecontext:
 \"\"\"{role_text.strip()}\"\"\"
 
-Voorbeelden:
+Voorbeelden (ter referentie, pas thema-keuze en formuleringen hierop aan):
 {examples_block}
 
 Taak:
-- Baseer je voorstel op de functiecontext, voorbeelden **en** de vaste thema-lijst.
-- Per thema 2–4 resultaatgebieden (één zin elk) met AEM-Cube buckets.
-- Schrijf compact en concreet, in het Nederlands."""
+- Kies maximaal {top_n} thema's uit ALLOWED_THEMES die het best passen bij de functie + (optioneel) sector/orgtype.
+- Per gekozen thema 2–4 resultaatgebieden, elk één zin, met A/E/M buckets (alleen buckets).
+- Retourneer **enkel JSON** volgens het afgesproken schema.
+"""
 
-    llm = ChatOpenAI(model=GEN_MODEL, temperature=0.2)
+    # 3) JSON-only response
+    llm = ChatOpenAI(
+        model=GEN_MODEL,
+        temperature=0.2,
+        model_kwargs={"response_format": {"type": "json_object"}}
+    )
     resp = llm.invoke([
         {"role": "system", "content": system_msg},
         {"role": "user", "content": user_msg},
     ])
-    return resp.content
+
+    raw = resp.content or "{}"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, flags=re.S)
+        data = json.loads(m.group(0)) if m else {"themes": []}
+
+    allowed_names = [t["name"] for t in allowed_themes]
+    markdown = _render_markdown_from_struct(data, allowed_names)
+    return markdown
 
 # ── UI (titel + omschrijving + filters) ──────────────────────────────
 with st.form("ra_form"):
@@ -483,7 +440,7 @@ with st.form("ra_form"):
     )
     k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=10, value=4)
 
-    # Single-select dropdowns (work now with soft bias; later become hard filters automatically)
+    # Single-select dropdowns
     ORG_TYPES = ["(alle)", "profit", "nonprofit"]
     SECTORS   = ["(alle)",
         "healthcare", "education", "government", "finance", "tech",
@@ -491,6 +448,9 @@ with st.form("ra_form"):
     ]
     org_type_choice = st.selectbox("Organisatietype", ORG_TYPES, index=0)
     sector_choice   = st.selectbox("Sector", SECTORS, index=0)
+
+    # how many themes should the model pick
+    top_n = st.slider("Aantal thema’s te kiezen", 1, 6, 3)
 
     submitted = st.form_submit_button("Formuleer resultaatgebieden")
 
@@ -512,23 +472,17 @@ if submitted:
             sector=chosen_sector
         )
 
-        # Load AEM themes from Word and auto-select best ones (role + examples), locked to your list
+        # Load FULL AEM themes from Word (allowed list)
         all_themes = load_themes_from_docx()
-        picked = select_themes_for_role_and_examples(
-            themes=all_themes,
-            role_title=role_title,
-            role_desc=role_desc,
-            examples=examples,
-            top_n=3,        # tweak 1..6
-            alpha=0.7       # 70% role similarity, 30% example coverage
-        )
 
+        # LLM selects the best-fitting themes from the allowed list (no fuzzy, exact names only)
         markdown = generate_result_areas(
             role_title, role_desc, examples,
-            selected_themes=picked,
+            allowed_themes=all_themes,
             language="nl",
             org_type=chosen_org,
-            sector=chosen_sector
+            sector=chosen_sector,
+            top_n=int(top_n)
         )
 
     st.markdown("### Resultaat")
@@ -541,15 +495,8 @@ if submitted:
             "band_attachment", "band_exploration", "band_managing_complexity",
             "org_type", "sector", "source", "function_title"
         ]
-        # keep only columns that exist in the dicts
         ex_cols = [c for c in ex_cols if any(c in e for e in examples)]
         ex_df = pd.DataFrame(examples)[ex_cols]
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
-
-
-
-
-
-
