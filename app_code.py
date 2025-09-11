@@ -261,20 +261,31 @@ def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
 
 # ── Prompt build (LLM selects themes from allowed list) ───────────────
 def build_system_msg(allowed_themes: List[Dict]) -> str:
-    allowed_names = [t["name"] for t in allowed_themes] if allowed_themes else []
-    allowed_str = ", ".join(allowed_names) if allowed_names else "(none)"
+    # Toon elke themanaam met de bijbehorende A/E/M uit Word
+    def fmt_theme(t):
+        name = t.get("name","").strip()
+        A = (t.get("A") or "").strip()
+        E = (t.get("E") or "").strip()
+        M = (t.get("M") or "").strip()
+        hints = []
+        if A: hints.append(f"A: {A}")
+        if E: hints.append(f"E: {E}")
+        if M: hints.append(f"M: {M}")
+        return f"- {name}" + (f" ({', '.join(hints)})" if hints else "")
+
+    allowed_lines = "\n".join(fmt_theme(t) for t in allowed_themes if t.get("name"))
 
     return f"""Je bent een HR/Org design assistent. 
 Je taak:
-1) Kies het **best passende aantal thema's** (meestal 2–5, maximaal 6) uitsluitend uit ALLOWED_THEMES die het beste aansluiten op de functiecontext.
-2) Formuleer per gekozen thema **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
-3) Geef per resultaatgebied de **AEM-buckets** op (A, E, M) op bucket-niveau (geen exacte percentages).
+1) Kies het **best passende aantal thema's** (meestal 2–5, max 6) **uitsluitend** uit ALLOWED_THEMES.
+2) **Gebruik de themanaam en A/E/M-buckets exact zoals hieronder geschreven** (geen eigen waarden of schattingen).
+3) Formuleer per gekozen thema **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
 
 Selectiecriteria (in volgorde):
-- Match met **functietitel** en **beschrijving** (taken/scope).
+- Match met **functietitel** en **beschrijving**.
 - Relevantie voor **sector** en **organisatietype** (profit/nonprofit) indien opgegeven.
-- Dekkingsgraad in **opgehaalde voorbeelden** (indien aanwezig).
-- Vermijd overlap; kies complementaire thema's die samen de functie dekken.
+- Dekkingsgraad in **opgehaalde voorbeelden**.
+- Vermijd overlap; kies complementaire thema's.
 
 AEM THEORY (beknopt)
 - Attachment (A): mens/relatie vs inhoud/systeem
@@ -284,16 +295,17 @@ AEM THEORY (beknopt)
 SCHRIJFREGELS (NL)
 - Resultaatgebied = één zin met **wat** + **waarom** (concreet, compact).
 
-ALLOWED_THEMES: {allowed_str}
+ALLOWED_THEMES (met **vaste** A/E/M):
+{allowed_lines}
 
 UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
 {{
   "themes": [
     {{
-      "name": "<één uit ALLOWED_THEMES>",
-      "A": "<bucket (bijv. 0-25 | 25-50 | 50-75 | 75-100 | hoog/laag)>",
-      "E": "<bucket>",
-      "M": "<bucket>",
+      "name": "<exact uit ALLOWED_THEMES>",
+      "A": "<exact uit ALLOWED_THEMES>",
+      "E": "<exact uit ALLOWED_THEMES>",
+      "M": "<exact uit ALLOWED_THEMES>",
       "result_areas": [
         "<één zin wat+waarom>",
         "<…>"
@@ -302,6 +314,7 @@ UITVOERFORMAAT (STRICT JSON, alleen dit object retourneren):
   ]
 }}
 """
+
 
 
 def build_examples_block(examples: List[Dict]) -> str:
@@ -323,22 +336,40 @@ def build_examples_block(examples: List[Dict]) -> str:
         lines.append(line)
     return "Relevante voorbeelden:\n" + "\n".join(lines)
 
-def _render_markdown_from_struct(struct: dict, allowed_names: List[str]) -> str:
-    """Render naar Markdown; alleen exact-allowed thema's worden getoond."""
+def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> str:
+    # Map: normalized name -> canonical {name, A, E, M}
+    def norm_name(s: str) -> str:
+        s = (s or "").strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        return s
+
+    canon_map = {}
+    for t in allowed_themes:
+        nm = t.get("name")
+        if not nm: continue
+        canon_map[norm_name(nm)] = {
+            "name": nm,
+            "A": (t.get("A") or "").strip(),
+            "E": (t.get("E") or "").strip(),
+            "M": (t.get("M") or "").strip(),
+        }
+
     lines = []
     for item in struct.get("themes", []):
-        name = (item.get("name") or "").strip()
-        if name not in allowed_names:
-            continue  # drop onbekend thema
+        raw = (item.get("name") or "").strip()
+        canon = canon_map.get(norm_name(raw))
+        if not canon:
+            continue  # onbekend thema → negeren
 
-        A = item.get("A", "")
-        E = item.get("E", "")
-        M = item.get("M", "")
+        # OVERRULE: altijd A/E/M uit Word gebruiken (niet uit model)
+        A = canon["A"]
+        E = canon["E"]
+        M = canon["M"]
         ras = [ra for ra in (item.get("result_areas") or []) if isinstance(ra, str) and ra.strip()]
         if not ras:
             continue
 
-        lines.append(f"### {name}")
+        lines.append(f"### {canon['name']}")
         aem_bits = []
         if A: aem_bits.append(f"A={A}")
         if E: aem_bits.append(f"E={E}")
@@ -348,7 +379,9 @@ def _render_markdown_from_struct(struct: dict, allowed_names: List[str]) -> str:
         for ra in ras[:4]:
             lines.append(f"- **Resultaatgebied:** {ra.strip()}")
         lines.append("")
+
     return "\n".join(lines).strip() or "_Geen geldige thema’s met resultaatgebieden._"
+
 
 def generate_result_areas(
     role_title: str,
@@ -472,6 +505,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
