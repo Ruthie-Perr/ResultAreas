@@ -173,7 +173,6 @@ LEVEL_HEADERS = {
     "strategisch": "Strategisch",
     "tactisch": "Tactisch",
     "operationeel": "Operationeel",
-    # voeg "specialistisch werk": "Specialistisch werk" toe als je die laag ook gebruikt
 }
 
 def _is_level_header(line: str) -> str | None:
@@ -183,107 +182,82 @@ def _is_level_header(line: str) -> str | None:
             return label
     return None
 
-def _is_metric_line(line: str) -> Optional[tuple[str, str]]:
-    m = re.match(r"^\s*([AEM])\s*:\s*(.+?)\s*$", line, flags=re.IGNORECASE)
-    if not m: return None
-    axis = m.group(1).upper()
-    val  = m.group(2).strip().replace("–", "-").replace("—", "-")
-    return axis, val
-
-def _clean_theme_name(line: str) -> str:
-    return line.lstrip("-*• ").strip()
-
 @st.cache_resource
 def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
+    """
+    Inline-only parser for themes like:
+      Relatiebeheer (A: 75-100, E: 25-50, M: 0-25)
+    grouped under level headers:
+      Strategisch / Tactisch / Operationeel
+    """
     try:
         from docx import Document
     except ImportError:
         st.error("Voeg `python-docx` toe aan requirements.txt om thema’s uit Word te lezen.")
         return []
+
     path = Path(path)
     if not path.exists():
-        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo (bijv. ./).")
+        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo.")
         return []
 
     doc = Document(str(path))
+
+    # Gather all lines (paragraphs + tables)
     lines: List[str] = []
     for p in doc.paragraphs:
         t = (p.text or "").strip()
-        if t: lines.append(t)
+        if t:
+            lines.append(t)
     for tbl in getattr(doc, "tables", []):
         for row in tbl.rows:
             for cell in row.cells:
                 t = (cell.text or "").strip()
-                if t: lines.append(t)
+                if t:
+                    lines.append(t)
+
+    # Inline pattern: "<name> (A: ..., E: ..., M: ...)"
+    inline_re = re.compile(
+        r"^(?P<name>.+?)\s*\(\s*A\s*:\s*(?P<A>[^,]+?),\s*E\s*:\s*(?P<E>[^,]+?),\s*M\s*:\s*(?P<M>[^)]+?)\s*\)\s*$",
+        flags=re.IGNORECASE
+    )
 
     themes: List[Dict] = []
-    seen_keys: set[str] = set()
+    seen: set[str] = set()
     current_level: Optional[str] = None
-    i, n = 0, len(lines)
 
-    while i < n:
-        raw = lines[i].strip()
-        if not raw: i += 1; continue
+    for raw in lines:
+        s = raw.strip()
+        if not s:
+            continue
 
-        lvl = _is_level_header(raw)
+        # Level header?
+        lvl = _is_level_header(s)
         if lvl:
             current_level = lvl
-            i += 1
             continue
 
-        if _is_metric_line(raw):
-            i += 1
-            continue
+        # Inline theme?
+        m = inline_re.match(s)
+        if not m:
+            continue  # ignore everything that isn't an inline theme row
 
-        candidate = _clean_theme_name(raw)
-        if len(candidate.split()) > 8:
-            i += 1
-            continue
+        name = m.group("name").strip()
+        A = m.group("A").strip().replace("–", "-").replace("—", "-")
+        E = m.group("E").strip().replace("–", "-").replace("—", "-")
+        M = m.group("M").strip().replace("–", "-").replace("—", "-")
 
-        theme_dict = _parse_theme_line(candidate)
-        theme_dict.setdefault("name", candidate)
+        rec = {"name": name, "A": A, "E": E, "M": M}
         if current_level:
-            theme_dict["level"] = current_level
+            rec["level"] = current_level
 
-        j = i + 1
-        axes = {"A": None, "E": None, "M": None}
-        while j < n:
-            nxt = lines[j].strip()
-            if not nxt: j += 1; continue
-            if _is_level_header(nxt): break
-            mm = _is_metric_line(nxt)
-            if mm:
-                axis, val = mm
-                axes[axis] = val
-                j += 1
-                continue
-            looks_like_theme = (len(_clean_theme_name(nxt).split()) <= 8) and (not _is_metric_line(nxt))
-            if looks_like_theme: break
-            j += 1
-
-        if axes["A"] and not theme_dict.get("A"): theme_dict["A"] = axes["A"]
-        if axes["E"] and not theme_dict.get("E"): theme_dict["E"] = axes["E"]
-        if axes["M"] and not theme_dict.get("M"): theme_dict["M"] = axes["M"]
-
-        key = f"{_normalize_txt(theme_dict['name'])}||{theme_dict.get('level','')}"
-        if theme_dict["name"] and key not in seen_keys:
-            seen_keys.add(key)
-            themes.append(theme_dict)
-
-        i = j
-
-    if not themes:
-        seen = set()
-        for ln in lines:
-            raw = ln.lstrip("-*• ").strip()
-            if not raw: continue
-            if len(raw.split()) <= 6 or re.match(r"^[\-\*•]\s+", ln):
-                t = _parse_theme_line(raw)
-                key = _normalize_txt(t.get("name", ""))
-                if key and key not in seen:
-                    seen.add(key); themes.append(t)
+        key = f"{_normalize_txt(name)}||{rec.get('level','')}"
+        if key not in seen:
+            seen.add(key)
+            themes.append(rec)
 
     return themes
+
 
 # ── Prompt build (LLM selects themes from allowed list) ───────────────
 def build_system_msg(allowed_themes: List[Dict]) -> str:
@@ -498,6 +472,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
