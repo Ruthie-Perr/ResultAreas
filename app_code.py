@@ -426,6 +426,7 @@ Taak:
         {"role": "user", "content": user_msg},
     ])
 
+
     raw = resp.content or "{}"
     try:
         data = json.loads(raw)
@@ -433,8 +434,7 @@ Taak:
         m = re.search(r"\{.*\}", raw, flags=re.S)
         data = json.loads(m.group(0)) if m else {"themes": []}
 
-    allowed_names = [t["name"] for t in allowed_themes]
-    markdown = _render_markdown_from_struct(data, allowed_names)
+    markdown = _render_markdown_from_struct(data, allowed_themes)
     return markdown
 
 
@@ -505,6 +505,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
