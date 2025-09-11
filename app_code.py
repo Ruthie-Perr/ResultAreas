@@ -396,16 +396,37 @@ def generate_result_areas(
     system_msg = build_system_msg(allowed_themes)
     user_msg = f"""Language: {language}
 
-Functiecontext:
+FUNCTIECONTEXT
 \"\"\"{role_text.strip()}\"\"\"
 
-Voorbeelden (alleen ter inspiratie/bias — kies wat inhoudelijk past):
+VOORBEELDEN (alleen ter inspiratie/bias; kies wat inhoudelijk past)
 {examples_block}
 
-Taak:
-- Kies 2–6 thema’s uit ALLOWED_THEMES (exacte naam en A/E/M).
-- Per thema 2–4 resultaatgebieden (één zin elk) + korte rationale.
-- Retourneer **uitsluitend JSON** volgens het schema.
+OPDRACHT (VOLG STRENG DEZE REGELS)
+- Kies in totaal **3–4 thema’s** **uitsluitend** uit ALLOWED_THEMES.
+- **Neem minstens 2 thema’s** op uit de lijst REQUIRED_THEMES (indien aanwezig).
+- Gebruik de **themanaam exact** zoals in ALLOWED_THEMES.
+- Gebruik per thema de **A/E/M-buckets exact** zoals in ALLOWED_THEMES (geen alternatieve waarden).
+- Per gekozen thema: **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
+- Voeg per gekozen thema een **korte rationale** toe: waarom past dit thema bij deze functiecontext?
+- **Introducéér geen nieuwe thema’s** en verander geen thema-namen.
+
+ALLEEN DIT JSON-OBJECT RETOURNEREN (geen extra tekst):
+{{
+  "themes": [
+    {{
+      "name": "<exacte themanaam uit ALLOWED_THEMES>",
+      "A": "<exact uit ALLOWED_THEMES>",
+      "E": "<exact uit ALLOWED_THEMES>",
+      "M": "<exact uit ALLOWED_THEMES>",
+      "reason": "<korte rationale (1 zin)>",
+      "result_areas": [
+        "<één zin (wat + waarom)>",
+        "<…>"
+      ]
+    }}
+  ]
+}}
 """
 
     llm = ChatOpenAI(
@@ -498,6 +519,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
