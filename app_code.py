@@ -374,7 +374,7 @@ def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> st
         if not ras:
             continue
 
-        lines.append(f"### {canon['name']}")
+        lines.append(f"**Thema: {canon['name']}**")
         aem_bits = []
         if A: aem_bits.append(f"A={A}")
         if E: aem_bits.append(f"E={E}")
@@ -654,6 +654,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
