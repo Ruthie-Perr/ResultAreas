@@ -450,7 +450,8 @@ except Exception as e:
     bottom = 2.0 * cm
     line_height = 14 * 1.2  # 1.2 leading
 
-    y = top
+    y = top - logo_height - 1*cm
+
 
     def write_line(text: str, size: int = 11, indent: float = 0):
         nonlocal y
@@ -672,6 +673,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
