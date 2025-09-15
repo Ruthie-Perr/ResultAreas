@@ -20,6 +20,15 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
 
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from datetime import datetime
+
+
 # ── CONFIG ─────────────────────────────────────────────────────────────
 PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
@@ -378,6 +387,112 @@ def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> st
 
     return "\n".join(lines).strip() or "_Geen geldige thema’s met resultaatgebieden._"
 
+def _markdown_to_plain_lines(md: str) -> list[str]:
+    """
+    Very light markdown-to-plain rendering:
+    - Strip leading ###/##/# (keep the text)
+    - Keep bullet markers
+    - Remove **bold** markers
+    - Trim extra spaces
+    """
+    lines = []
+    for raw in (md or "").splitlines():
+        s = raw.rstrip()
+        if not s:
+            lines.append("")
+            continue
+        # headers -> keep text only
+        s = re.sub(r"^\s*#{1,6}\s*", "", s)
+        # bold/italics markers
+        s = s.replace("**", "").replace("__", "").replace("*", "")
+        # turn smart dashes into normal hyphen
+        s = s.replace("–", "-").replace("—", "-")
+        lines.append(s)
+    return lines
+
+def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
+    """
+    Render a simple, readable PDF with a title, optional role description,
+    and the generated markdown content converted to plain lines.
+    """
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # Font setup (uses PDF_FONT if defined, else Helvetica)
+    font_name = globals().get("PDF_FONT", "Helvetica")
+    c.setTitle(title or "Resultaatgebieden")
+    c.setAuthor("Resultaatgebieden (Generator)")
+    c.setFont(font_name, 14)
+
+    # Margins and layout
+    left = 2.0 * cm
+    right = width - 2.0 * cm
+    top = height - 2.0 * cm
+    bottom = 2.0 * cm
+    line_height = 14 * 1.2  # 1.2 leading
+
+    y = top
+
+    def write_line(text: str, size: int = 11, indent: float = 0):
+        nonlocal y
+        c.setFont(font_name, size)
+        max_width = right - (left + indent)
+        # naive wrap
+        words = text.split(" ")
+        line = ""
+        for w in words:
+            test = (line + " " + w).strip()
+            if c.stringWidth(test, font_name, size) > max_width and line:
+                c.drawString(left + indent, y, line)
+                y -= line_height
+                if y < bottom:
+                    c.showPage()
+                    y = top
+                    c.setFont(font_name, size)
+                line = w
+            else:
+                line = test
+        # last bit
+        if line or text == "":
+            c.drawString(left + indent, y, line)
+            y -= line_height
+            if y < bottom:
+                c.showPage()
+                y = top
+                c.setFont(font_name, size)
+
+    # Header
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    write_line(title or "Resultaatgebieden", size=16)
+    write_line(f"Aangemaakt: {now_str}", size=9)
+    write_line("")
+
+    # Optional context
+    if role_desc and role_desc.strip():
+        write_line("Functiecontext", size=12)
+        for l in _markdown_to_plain_lines(role_desc):
+            write_line(l, size=10)
+        write_line("")
+
+    # Body (from markdown)
+    lines = _markdown_to_plain_lines(md_content)
+    bullet_indent = 0.6 * cm
+    for l in lines:
+        if l.startswith("- "):
+            write_line("• " + l[2:], size=11, indent=bullet_indent)
+        else:
+            # Treat lines that were headers in md (we stripped #) but still look like section titles
+            if l and not l.startswith(("•", "- ", "Resultaatgebied:")) and l == l.upper():
+                write_line(l, size=12)
+            else:
+                write_line(l, size=11)
+
+    c.save()
+    buffer.seek(0)
+    return buffer.read()
+
+
 
 def generate_result_areas(
     role_title: str,
@@ -508,6 +623,25 @@ if submitted:
     st.markdown("### Resultaat")
     st.markdown(markdown, unsafe_allow_html=False)
 
+        # ⬇️ NEW: PDF download button
+    try:
+        pdf_bytes = build_pdf_bytes(
+            title=f"Resultaatgebieden — {role_title.strip() or 'Onbekende functie'}",
+            role_desc=f"Functietitel: {role_title}\n\nOmschrijving: {role_desc}",
+            md_content=markdown,
+        )
+        st.download_button(
+            label="📄 Download als PDF",
+            data=pdf_bytes,
+            file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', role_title or 'functie')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.warning(f"Kon PDF niet genereren: {e}")
+
+    
+
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
         ex_cols = [
@@ -520,6 +654,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
