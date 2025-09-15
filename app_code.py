@@ -419,6 +419,24 @@ def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
+    # --- Draw logo in top-right ---
+logo_path = "AEM-Cube_Poster3_HI_Logo.png"
+try:
+    logo_width = 3.5 * cm   # adjust size if needed
+    logo_height = 3.5 * cm
+    c.drawImage(
+        logo_path,
+        width - logo_width - 2*cm,  # 2 cm margin from right edge
+        height - logo_height - 2*cm,  # 2 cm margin from top
+        width=logo_width,
+        height=logo_height,
+        preserveAspectRatio=True,
+        mask="auto",
+    )
+except Exception as e:
+    # If file not found, just skip silently
+    pass
+
     # Font setup (uses PDF_FONT if defined, else Helvetica)
     font_name = globals().get("PDF_FONT", "Helvetica")
     c.setTitle(title or "Resultaatgebieden")
@@ -654,6 +672,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
