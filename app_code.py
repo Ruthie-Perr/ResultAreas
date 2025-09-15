@@ -411,51 +411,34 @@ def _markdown_to_plain_lines(md: str) -> list[str]:
     return lines
 
 def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
+    """
+    Render a simple, readable PDF with a title, optional role description,
+    and the generated markdown content converted to plain lines.
+    """
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
+    # Font setup (uses PDF_FONT if defined, else Helvetica)
+    font_name = globals().get("PDF_FONT", "Helvetica")
     c.setTitle(title or "Resultaatgebieden")
     c.setAuthor("Resultaatgebieden (Generator)")
+    c.setFont(font_name, 14)
 
-    # Page geometry
+    # Margins and layout
     left = 2.0 * cm
     right = width - 2.0 * cm
     top = height - 2.0 * cm
     bottom = 2.0 * cm
+    line_height = 14 * 1.2  # 1.2 leading
 
-    base_size = 11
-    line_height = base_size * 1.2
+    y = top
 
-    # --- Logo (top-right) ---
-    logo_height = 0
-    try:
-        logo_path = "AEM-Cube_Poster3_HI_Logo.png"
-        logo_width = 3.5 * cm
-        logo_height = 3.5 * cm
-        c.drawImage(
-            logo_path,
-            width - logo_width - 2*cm,     # right margin
-            height - logo_height - 2*cm,   # top margin
-            width=logo_width,
-            height=logo_height,
-            preserveAspectRatio=True,
-            mask="auto",
-        )
-    except Exception:
-        # If missing, just skip; y will start at top
-        logo_height = 0
-
-    # Start y below the logo to avoid overlap
-    y = top - (logo_height + 1*cm if logo_height else 0)
-
-    # --- Wrapped writer helper (uses enclosing y) ---
-    def write_wrapped(text: str, size: int = base_size, indent: float = 0, font_name: str = None):
+    def write_line(text: str, size: int = 11, indent: float = 0):
         nonlocal y
-        font_name = font_name or PDF_FONT
         c.setFont(font_name, size)
         max_width = right - (left + indent)
-
+        # naive wrap
         words = text.split(" ")
         line = ""
         for w in words:
@@ -465,84 +448,49 @@ def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
                 y -= line_height
                 if y < bottom:
                     c.showPage()
-                    # Optionally draw logo again on new pages; comment out if not desired
-                    try:
-                        if logo_height:
-                            c.drawImage(
-                                logo_path,
-                                width - logo_width - 2*cm,
-                                height - logo_height - 2*cm,
-                                width=logo_width,
-                                height=logo_height,
-                                preserveAspectRatio=True,
-                                mask="auto",
-                            )
-                    except Exception:
-                        pass
-                    y = top - (logo_height + 1*cm if logo_height else 0)
+                    y = top
                     c.setFont(font_name, size)
                 line = w
             else:
                 line = test
-
-        # last segment
+        # last bit
         if line or text == "":
             c.drawString(left + indent, y, line)
             y -= line_height
             if y < bottom:
                 c.showPage()
-                # repeat logo on new page if present
-                try:
-                    if logo_height:
-                        c.drawImage(
-                            logo_path,
-                            width - logo_width - 2*cm,
-                            height - logo_height - 2*cm,
-                            width=logo_width,
-                            height=logo_height,
-                            preserveAspectRatio=True,
-                            mask="auto",
-                        )
-                except Exception:
-                    pass
-                y = top - (logo_height + 1*cm if logo_height else 0)
+                y = top
+                c.setFont(font_name, size)
 
-    # --- Header ---
-    c.setFont(PDF_FONT_BOLD, 16)
-    c.drawString(left, y, (title or "Resultaatgebieden"))
-    y -= line_height
+    # Header
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    write_line(title or "Resultaatgebieden", size=16)
+    write_line(f"Aangemaakt: {now_str}", size=9)
+    write_line("")
 
-    c.setFont(PDF_FONT, 9)
-    c.drawString(left, y, f"Aangemaakt: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    y -= line_height * 1.2
-
-    # --- Role context (optional) ---
+    # Optional context
     if role_desc and role_desc.strip():
-        c.setFont(PDF_FONT_BOLD, 12)
-        c.drawString(left, y, "Functiecontext")
-        y -= line_height
+        write_line("Functiecontext", size=12)
         for l in _markdown_to_plain_lines(role_desc):
-            write_wrapped(l, size=10, font_name=PDF_FONT)
-        y -= line_height * 0.5
+            write_line(l, size=10)
+        write_line("")
 
-    # --- Body from markdown ---
+    # Body (from markdown)
     lines = _markdown_to_plain_lines(md_content)
     bullet_indent = 0.6 * cm
-
     for l in lines:
-        if l.startswith("Thema:"):
-            # TRUE BOLD for theme lines
-            write_wrapped(l, size=12, font_name=PDF_FONT_BOLD)
-            continue
         if l.startswith("- "):
-            write_wrapped("• " + l[2:], size=11, indent=bullet_indent, font_name=PDF_FONT)
+            write_line("• " + l[2:], size=11, indent=bullet_indent)
         else:
-            write_wrapped(l, size=11, font_name=PDF_FONT)
+            # Treat lines that were headers in md (we stripped #) but still look like section titles
+            if l and not l.startswith(("•", "- ", "Resultaatgebied:")) and l == l.upper():
+                write_line(l, size=12)
+            else:
+                write_line(l, size=11)
 
     c.save()
     buffer.seek(0)
     return buffer.read()
-
 
 
 
@@ -706,6 +654,18 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
