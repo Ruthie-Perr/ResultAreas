@@ -147,7 +147,7 @@ THEORY = """AEM-Cube theory:
 - Managing Complexity: specialisten (diepte) vs generalisten (breedte)."""
 
 HOW_TO_RA_NL = """Resultaatgebieden:
-- 3–6 per functie; ingedeeld in thema's; essentieel, door één individu uitvoerbaar.
+- 6–10 per functie; ingedeeld in thema's; essentieel, door één individu uitvoerbaar.
 - Proces met begin en eind; gebruik werkwoorden die iets opleveren/creëren.
 - Eén zin die het **wat** én het **waarom** combineert.
 - Voorbeeld: “transparante rekeningen leveren **zodat** we een tevreden klantenbasis opbouwen.”"""
@@ -553,5 +553,6 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
