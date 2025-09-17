@@ -554,7 +554,7 @@ if "ra_markdown" in st.session_state:
     st.markdown("### Resultaat")
     st.markdown(st.session_state["ra_markdown"], unsafe_allow_html=False)
 
-    st.markdown("### Bewerk resultaat indien gewenst(Markdown)")
+    st.markdown("### Bewerk hier resultaat indien gewenst")
     st.text_area(
         "Pas de tekst aan (dit is wat er in de PDF komt):",
         key="ra_edited_md",
@@ -583,6 +583,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
