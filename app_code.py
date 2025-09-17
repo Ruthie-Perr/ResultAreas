@@ -524,15 +524,22 @@ if submitted:
     st.markdown("### Resultaat")
     st.markdown(markdown, unsafe_allow_html=False)
 
-    # PDF download button
+    st.markdown("### Bewerk resultaat (Markdown)")
+    edited_md = st.text_area(
+        "Pas de tekst aan (dit is wat er in de PDF komt):",
+        value=markdown,
+        height=350
+    )
+
+    # ↓ Gebruik vanaf hier edited_md i.p.v. markdown
     try:
         pdf_bytes = build_pdf_bytes(
             title=f"Resultaatgebieden — {role_title.strip() or 'Onbekende functie'}",
             role_desc=f"Functietitel: {role_title}\n\nOmschrijving: {role_desc}",
-            md_content=markdown,
+            md_content=edited_md,  # <— belangrijk
         )
         st.download_button(
-            label="📄 Download PDF",
+            label="📄 Download als PDF",
             data=pdf_bytes,
             file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', role_title or 'functie')}.pdf",
             mime="application/pdf",
@@ -540,6 +547,7 @@ if submitted:
         )
     except Exception as e:
         st.warning(f"Kon PDF niet genereren: {e}")
+
 
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
@@ -553,6 +561,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
