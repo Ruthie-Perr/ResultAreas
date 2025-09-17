@@ -1,4 +1,4 @@
-# app.py — Result Areas Generator (LLM selects themes from allowed list; sector/profit-aware)
+# app.py — Result Areas Generator (LLM generates result areas first; then assigns themes)
 
 # --- SQLite shim for Streamlit Cloud (Chromadb requires sqlite >= 3.35) ---
 import sys
@@ -24,8 +24,6 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
 
 
@@ -34,7 +32,6 @@ PERSIST_DIR     = "chroma_db"
 COLLECTION_NAME = "kb_result_areas"
 EMBED_MODEL     = "text-embedding-3-small"
 GEN_MODEL       = "gpt-4o-mini"  # or "gpt-4o" / "gpt-4.1-mini"
-THEMES_PATH     = Path(__file__).parent / "AEM_Cube_Themas.docx"
 
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -155,123 +152,43 @@ HOW_TO_RA_NL = """Resultaatgebieden:
 - Eén zin die het **wat** én het **waarom** combineert.
 - Voorbeeld: “transparante rekeningen leveren **zodat** we een tevreden klantenbasis opbouwen.”"""
 
-# ── Theme loading from Word ───────────────────────────────────────────
-def _normalize_txt(s: str) -> str:
-    s = (s or "").strip().lower()
-    s = re.sub(r"[^\w\s]", " ", s)
-    s = re.sub(r"\s+", " ", s)
-    return s
+# ── Inline ALLOWED THEMES (replaces Word .docx loader) ────────────────
+THEMES_ALLOWED: List[Dict[str, str]] = [
+    # Strategisch (Beleidsmakers)
+    {"name": "Stakeholder alignment", "A": "75-100", "E": "25-50", "M": "75-100", "level": "Strategisch"},
+    {"name": "Governance & Cultuur", "A": "75-100", "E": "0-25", "M": "65-100", "level": "Strategisch"},
+    {"name": "Netwerkvorming & Partnerships", "A": "75-100", "E": "75-100", "M": "75-100", "level": "Strategisch"},
+    {"name": "Markt- en Trendontwikkeling", "A": "50-75", "E": "75-100", "M": "75-100", "level": "Strategisch"},
+    {"name": "Beleidsplanning & Control", "A": "0-25", "E": "0-25", "M": "75-100", "level": "Strategisch"},
+    {"name": "Compliancebeleid", "A": "0-25", "E": "0-25", "M": "75-100", "level": "Strategisch"},
+    {"name": "Strategische innovatie & R&D", "A": "0-25", "E": "75-100", "M": "75-100", "level": "Strategisch"},
+    {"name": "Visievorming nieuwe markten", "A": "25-50", "E": "75-100", "M": "75-100", "level": "Strategisch"},
 
-def _parse_theme_line(txt: str):
-    out = {"name": txt.strip()}
-    m = re.search(r"\((.*?)\)$", out["name"])
-    if m:
-        inside = m.group(1)
-        out["name"] = out["name"][: m.start()].strip()
-        for part in inside.split(","):
-            part = part.strip()
-            if re.match(r"^A\s*:", part, flags=re.I):
-                out["A"] = part.split(":", 1)[1].strip()
-            if re.match(r"^E\s*:", part, flags=re.I):
-                out["E"] = part.split(":", 1)[1].strip()
-            if re.match(r"^M\s*:", part, flags=re.I):
-                out["M"] = part.split(":", 1)[1].strip()
-    return out
+    # Tactisch (Managers)
+    {"name": "HR-processen", "A": "75-100", "E": "25-50", "M": "25-50", "level": "Tactisch"},
+    {"name": "Organisatiecultuur", "A": "75-100", "E": "50-75", "M": "50-75", "level": "Tactisch"},
+    {"name": "Schakel en Afstemming", "A": "75-100", "E": "25-50", "M": "50-75", "level": "Tactisch"},
+    {"name": "Teamontwikkeling & Samenwerking", "A": "75-100", "E": "50-75", "M": "50-75", "level": "Tactisch"},
+    {"name": "Resourceplanning & Efficiency", "A": "0-25", "E": "0-25", "M": "50-75", "level": "Tactisch"},
+    {"name": "Kwaliteitsmanagement", "A": "0-25", "E": "0-25", "M": "25-50", "level": "Tactisch"},
+    {"name": "Procesmanagement", "A": "0-25", "E": "0-25", "M": "25-50", "level": "Tactisch"},
+    {"name": "Procesinnovatie", "A": "25-50", "E": "50-75", "M": "50-75", "level": "Tactisch"},
 
-LEVEL_HEADERS = {
-    "strategisch": "Strategisch",
-    "tactisch": "Tactisch",
-    "operationeel": "Operationeel",
-}
+    # Operationeel (Uitvoerend)
+    {"name": "Relatiebeheer", "A": "75-100", "E": "25-50", "M": "0-25", "level": "Operationeel"},
+    {"name": "Dienstverlening & Ondersteuning", "A": "50-75", "E": "25-50", "M": "0-25", "level": "Operationeel"},
+    {"name": "Nieuwe relaties & Doelgroepen ontwikkelen", "A": "75-100", "E": "75-100", "M": "25-50", "level": "Operationeel"},
+    {"name": "Efficiënte uitvoering van processen", "A": "0-25", "E": "0-25", "M": "0-25", "level": "Operationeel"},
+    {"name": "Veiligheid & Naleving", "A": "0-25", "E": "0-25", "M": "0-25", "level": "Operationeel"},
+    {"name": "Specialistisch werk", "A": "0-25", "E": "0-25", "M": "0-25", "level": "Operationeel"},
+    {"name": "Kennis en inzicht delen", "A": "25-50", "E": "25-50", "M": "25-50", "level": "Operationeel"},
+    {"name": "Praktische innovaties", "A": "0-25", "E": "50-75", "M": "0-25", "level": "Operationeel"},
+]
 
-def _is_level_header(line: str) -> str | None:
-    norm = _normalize_txt(line)
-    for key, label in LEVEL_HEADERS.items():
-        if norm == key or norm.startswith(key):
-            return label
-    return None
-
-@st.cache_resource
-def load_themes_from_docx(path: str | Path = THEMES_PATH) -> List[Dict]:
-    """
-    Inline-only parser for themes like:
-      Relatiebeheer (A: 75-100, E: 25-50, M: 0-25)
-    grouped under level headers:
-      Strategisch / Tactisch / Operationeel
-    """
-    try:
-        from docx import Document
-    except ImportError:
-        st.error("Voeg `python-docx` toe aan requirements.txt om thema’s uit Word te lezen.")
-        return []
-
-    path = Path(path)
-    if not path.exists():
-        st.error(f"Thema-bestand niet gevonden op {path}. Zet het .docx in je repo.")
-        return []
-
-    doc = Document(str(path))
-
-    # Gather all lines (paragraphs + tables)
-    lines: List[str] = []
-    for p in doc.paragraphs:
-        t = (p.text or "").strip()
-        if t:
-            lines.append(t)
-    for tbl in getattr(doc, "tables", []):
-        for row in tbl.rows:
-            for cell in row.cells:
-                t = (cell.text or "").strip()
-                if t:
-                    lines.append(t)
-
-    # Inline pattern: "<name> (A: ..., E: ..., M: ...)"
-    inline_re = re.compile(
-        r"^(?P<name>.+?)\s*\(\s*A\s*:\s*(?P<A>[^,]+?),\s*E\s*:\s*(?P<E>[^,]+?),\s*M\s*:\s*(?P<M>[^)]+?)\s*\)\s*$",
-        flags=re.IGNORECASE
-    )
-
-    themes: List[Dict] = []
-    seen: set[str] = set()
-    current_level: Optional[str] = None
-
-    for raw in lines:
-        s = raw.strip()
-        if not s:
-            continue
-
-        # Level header?
-        lvl = _is_level_header(s)
-        if lvl:
-            current_level = lvl
-            continue
-
-        # Inline theme?
-        m = inline_re.match(s)
-        if not m:
-            continue  # ignore everything that isn't an inline theme row
-
-        name = m.group("name").strip()
-        A = m.group("A").strip().replace("–", "-").replace("—", "-")
-        E = m.group("E").strip().replace("–", "-").replace("—", "-")
-        M = m.group("M").strip().replace("–", "-").replace("—", "-")
-
-        rec = {"name": name, "A": A, "E": E, "M": M}
-        if current_level:
-            rec["level"] = current_level
-
-        key = f"{_normalize_txt(name)}||{rec.get('level','')}"
-        if key not in seen:
-            seen.add(key)
-            themes.append(rec)
-
-    return themes
-
-
-# ── Prompt build (LLM selects themes from allowed list) ───────────────
+# ── Prompt build (LLM defines RAs first, then assigns themes) ─────────
 def build_system_msg(allowed_themes: List[Dict]) -> str:
     def fmt_theme(t):
-        name = t.get("name","").strip()
+        name = t.get("name", "").strip()
         lvl  = (t.get("level") or "").strip()
         A = (t.get("A") or "").strip()
         E = (t.get("E") or "").strip()
@@ -287,16 +204,18 @@ def build_system_msg(allowed_themes: List[Dict]) -> str:
 
     return f"""Je bent een HR/Org design assistent.
 
-Doel:
-- Kies **2–6 thema's** die **het beste aansluiten** bij de functiecontext (functietitel + beschrijving), rekening houdend met sector en organisatietype (indien gegeven) en met de opgehaalde voorbeelden.
-- **Gebruik de themanaam en A/E/M-buckets exact zoals hieronder weergegeven**. Geen alternatieve of geschatte waarden.
-- Per gekozen thema: geef **2–4 resultaatgebieden** (elk in **exact één zin**, wat+waarom) en een **korte rationale** (één zinnetje) waarom dit thema past.
-
-Selectierichtlijnen:
-- Kies eerst thema's die de **kern van het werk** in de beschrijving weergeven.
-- Gebruik voorbeelden als **ondersteuning** bij de keuze van deze thema's.
-- Zorg voor **complementariteit**: de gekozen thema’s moeten samen de rol dekken, niet elkaars duplicaat zijn.
-
+DOEL EN SPELREGELS (ENKEL HIER, BRON VAN WAARHEID):
+- Genereer eerst **6–10 resultaatgebieden** (elk **exact één zin**: wat + waarom) die samen de functie dekken.
+- **Deel ALLE resultaatgebieden in** onder **3–4 best passende thema’s** uit ALLOWED_THEMES.
+- Elk resultaatgebied hoort in **exact één** thema (geen dubbeltellingen, geen restcategorie).
+- **Gebruik themanaam exact** zoals in ALLOWED_THEMES.
+- **Gebruik per thema de A/E/M-buckets exact** zoals in ALLOWED_THEMES (geen alternatieve waarden).
+- **Geen rationale** opnemen in de output.
+- **Context meenemen**:
+  - Baseer je primair op functietitel en -omschrijving.
+  - Neem opgegeven **sector** en **organisatietype** expliciet mee in formulering en clustering.
+  - Gebruik **voorbeelden** alleen ter inspiratie/bias; kopieer niet letterlijk.
+- Output is **strikt JSON** conform het schema hieronder (geen extra tekst).
 
 ALLOWED_THEMES (met exact te gebruiken A/E/M):
 {allowed_block}
@@ -309,7 +228,6 @@ UITVOERFORMAAT (STRICT JSON — alleen dit object):
       "A": "<exact uit ALLOWED_THEMES>",
       "E": "<exact uit ALLOWED_THEMES>",
       "M": "<exact uit ALLOWED_THEMES>",
-      "reason": "<korte rationale waarom dit thema past>",
       "result_areas": [
         "<één zin wat+waarom>",
         "<…>"
@@ -318,7 +236,6 @@ UITVOERFORMAAT (STRICT JSON — alleen dit object):
   ]
 }}
 """
-
 
 
 
@@ -340,6 +257,7 @@ def build_examples_block(examples: List[Dict]) -> str:
             line += f" | Bron: {ex['source']}"
         lines.append(line)
     return "Relevante voorbeelden:\n" + "\n".join(lines)
+
 
 def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> str:
     # Map: normalized name -> canonical {name, A, E, M}
@@ -366,7 +284,7 @@ def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> st
         if not canon:
             continue  # onbekend thema → negeren
 
-        # OVERRULE: altijd A/E/M uit Word gebruiken (niet uit model)
+        # OVERRULE: altijd A/E/M uit allowed list gebruiken (niet uit model)
         A = canon["A"]
         E = canon["E"]
         M = canon["M"]
@@ -380,12 +298,13 @@ def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> st
         if E: aem_bits.append(f"E={E}")
         if M: aem_bits.append(f"M={M}")
         if aem_bits:
-            lines.append("**AEM-Cube positie:** " + ", ".join(aem_bits))
+            lines.append("**AEM-Cube Score:** " + ", ".join(aem_bits))
         for ra in ras[:4]:
             lines.append(f"- **Resultaatgebied:** {ra.strip()}")
         lines.append("")
 
     return "\n".join(lines).strip() or "_Geen geldige thema’s met resultaatgebieden._"
+
 
 def _markdown_to_plain_lines(md: str) -> list[str]:
     """
@@ -410,6 +329,7 @@ def _markdown_to_plain_lines(md: str) -> list[str]:
         lines.append(s)
     return lines
 
+
 def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
     """
     Render a simple, readable PDF with a title, optional role description,
@@ -419,8 +339,8 @@ def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Font setup (uses PDF_FONT if defined, else Helvetica)
-    font_name = globals().get("PDF_FONT", "Helvetica")
+    # Font setup
+    font_name = "Helvetica"
     c.setTitle(title or "Resultaatgebieden")
     c.setAuthor("Resultaatgebieden (Generator)")
     c.setFont(font_name, 14)
@@ -482,7 +402,6 @@ def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
         if l.startswith("- "):
             write_line("• " + l[2:], size=11, indent=bullet_indent)
         else:
-            # Treat lines that were headers in md (we stripped #) but still look like section titles
             if l and not l.startswith(("•", "- ", "Resultaatgebied:")) and l == l.upper():
                 write_line(l, size=12)
             else:
@@ -491,8 +410,6 @@ def build_pdf_bytes(title: str, role_desc: str, md_content: str) -> bytes:
     c.save()
     buffer.seek(0)
     return buffer.read()
-
-
 
 def generate_result_areas(
     role_title: str,
@@ -518,31 +435,9 @@ FUNCTIECONTEXT
 VOORBEELDEN (alleen ter inspiratie/bias; kies wat inhoudelijk past)
 {examples_block}
 
-OPDRACHT (VOLG STRENG DEZE REGELS)
-- Kies in totaal **3–4 thema’s** **uitsluitend** uit ALLOWED_THEMES.
-- **Neem minstens 2 thema’s** op uit de lijst REQUIRED_THEMES (indien aanwezig).
-- Gebruik de **themanaam exact** zoals in ALLOWED_THEMES.
-- Gebruik per thema de **A/E/M-buckets exact** zoals in ALLOWED_THEMES (geen alternatieve waarden).
-- Per gekozen thema: **2–4 resultaatgebieden**, elk in **exact één zin** (wat + waarom).
-- Voeg per gekozen thema een **korte rationale** toe: waarom past dit thema bij deze functiecontext?
-- **Introducéér geen nieuwe thema’s** en verander geen thema-namen.
-
-ALLEEN DIT JSON-OBJECT RETOURNEREN (geen extra tekst):
-{{
-  "themes": [
-    {{
-      "name": "<exacte themanaam uit ALLOWED_THEMES>",
-      "A": "<exact uit ALLOWED_THEMES>",
-      "E": "<exact uit ALLOWED_THEMES>",
-      "M": "<exact uit ALLOWED_THEMES>",
-      "reason": "<korte rationale (1 zin)>",
-      "result_areas": [
-        "<één zin (wat + waarom)>",
-        "<…>"
-      ]
-    }}
-  ]
-}}
+OPDRACHT
+Formuleer resultaatgebieden en cluster ze in thema’s **volgens de spelregels in de system prompt**.
+Lever uitsluitend het JSON-object in het opgegeven formaat.
 """
 
     llm = ChatOpenAI(
@@ -562,10 +457,9 @@ ALLEEN DIT JSON-OBJECT RETOURNEREN (geen extra tekst):
         m = re.search(r"\{.*\}", raw, flags=re.S)
         data = json.loads(m.group(0)) if m else {"themes": []}
 
-    # NB: geef de VOLLEDIGE allowed dicts mee, zodat de renderer canonieke A/E/M kan afdwingen:
+    # Renderer houdt A/E/M altijd aan de allowed list (niet wat het model terugstuurt)
     markdown = _render_markdown_from_struct(data, allowed_themes)
     return markdown
-
 
 
 # ── UI (titel + omschrijving + filters) ──────────────────────────────
@@ -608,10 +502,10 @@ if submitted:
             sector=chosen_sector
         )
 
-        # Allowed list = alle thema's uit Word
-        all_themes = load_themes_from_docx()
+        # Allowed list = inline themes (no Word docx)
+        all_themes = THEMES_ALLOWED
 
-        # LLM kiest ZELF het aantal best passende thema's uit allowed list
+        # LLM genereert eerst RAs, clustert daarna in thema's, en levert JSON
         markdown = generate_result_areas(
             role_title, role_desc, examples,
             allowed_themes=all_themes,
@@ -623,7 +517,7 @@ if submitted:
     st.markdown("### Resultaat")
     st.markdown(markdown, unsafe_allow_html=False)
 
-        # ⬇️ NEW: PDF download button
+    # PDF download button
     try:
         pdf_bytes = build_pdf_bytes(
             title=f"Resultaatgebieden — {role_title.strip() or 'Onbekende functie'}",
@@ -640,8 +534,6 @@ if submitted:
     except Exception as e:
         st.warning(f"Kon PDF niet genereren: {e}")
 
-    
-
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
         ex_cols = [
@@ -654,31 +546,3 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
