@@ -304,7 +304,6 @@ def _render_markdown_from_struct(struct: dict, allowed_themes: List[Dict]) -> st
         if E: aem_bits.append(f"E={E}")
         if M: aem_bits.append(f"M={M}")
         if aem_bits:
-            lines.append("")
             lines.append("**AEM-Cube Score:** " + ", ".join(aem_bits))
         for ra in ras[:4]:
             lines.append(f"- **Resultaatgebied:** {ra.strip()}")
@@ -553,6 +552,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
