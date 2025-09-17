@@ -14,6 +14,7 @@ from typing import List, Dict, Optional
 import numpy as np
 import streamlit as st
 import pandas as pd
+import hashlib
 
 from PIL import Image
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -553,28 +554,37 @@ if "ra_markdown" in st.session_state:
     st.markdown("### Resultaat")
     st.markdown(st.session_state["ra_markdown"], unsafe_allow_html=False)
 
-    st.markdown("### Bewerk resultaat (Markdown)")
+    st.markdown("### Bewerk resultaat indien gewenst(Markdown)")
     st.text_area(
         "Pas de tekst aan (dit is wat er in de PDF komt):",
         key="ra_edited_md",
         height=350
     )
 
-    try:
-        pdf_bytes = build_pdf_bytes(
-            title=f"Resultaatgebieden — {st.session_state.get('ra_title') or 'Onbekende functie'}",
-            role_desc=f"Functietitel: {st.session_state.get('ra_title','')}\n\nOmschrijving: {st.session_state.get('ra_role_desc','')}",
-            md_content=st.session_state["ra_edited_md"],  # always the edited text
-        )
-        st.download_button(
-            label="📄 Download als PDF",
-            data=pdf_bytes,
-            file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', st.session_state.get('ra_title') or 'functie')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-    except Exception as e:
-        st.warning(f"Kon PDF niet genereren: {e}")
+    import hashlib
+    pdf_input = st.session_state.get("ra_edited_md", "")
+    pdf_bytes = build_pdf_bytes(
+        title=f"Resultaatgebieden — {st.session_state.get('ra_title') or 'Onbekende functie'}",
+        role_desc=(
+            f"Functietitel: {st.session_state.get('ra_title','')}"
+            f"\n\nOmschrijving: {st.session_state.get('ra_role_desc','')}"
+        ),
+        md_content=pdf_input,  # always the edited text
+    )
+
+    # Force a fresh button whenever text changes
+    pdf_key = "download_pdf_" + hashlib.md5(pdf_input.encode("utf-8")).hexdigest()[:8]
+
+    st.download_button(
+        label="📄 Download PDF",
+        data=pdf_bytes,
+        file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', st.session_state.get('ra_title') or 'functie')}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+        key=pdf_key,
+    )
+
+
 
 
 
