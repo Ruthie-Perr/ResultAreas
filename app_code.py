@@ -481,7 +481,7 @@ with st.form("ra_form"):
     # Single-select dropdowns
     ORG_TYPES = ["(alle)", "profit", "nonprofit"]
     SECTORS   = ["(alle)",
-        "Tech/IT", "Vastgoed", "Zorg & Welzijn", "Onderwijs", "Overheid", "Retail & Horeca", "Energie & Duuzaamheid", "Landbouw & Voeding",
+        "Tech/IT", "Vastgoed", "Zorg & Welzijn", "Onderwijs", "Overheid", "Retail & Horeca", "Energie & Duurzaamheid", "Landbouw & Voeding",
         "Industrie & Productie", "Logistiek & Transport", "Financiele Dienstverlening", "Bouw & Installatie", "Zakelijke Dienstverlening"
     ]
     
@@ -521,40 +521,20 @@ if submitted:
             sector=chosen_sector
         )
 
-    st.markdown("### Resultaat")
-    st.markdown(markdown, unsafe_allow_html=False)
+        # Sla resultaat op in session_state zodat het niet verdwijnt bij een rerun
+        st.session_state["ra_markdown"] = markdown
+        st.session_state["ra_title"] = role_title
+        st.session_state["ra_role_desc"] = role_desc
 
-    st.markdown("### Bewerk resultaat (Markdown)")
+        # Init editor alleen als er nog niets staat of als de brontekst veranderd is
+        if (
+            "ra_markdown_source" not in st.session_state
+            or st.session_state["ra_markdown_source"] != markdown
+        ):
+            st.session_state["ra_edited_md"] = markdown
+            st.session_state["ra_markdown_source"] = markdown
 
-    # init alleen de eerste keer
-    if "ra_edited_md" not in st.session_state:
-        st.session_state["ra_edited_md"] = markdown
-
-    # bind de textarea aan state (GEEN value=markdown meer!)
-    edited_md = st.text_area(
-        "Pas de tekst aan (dit is wat er in de PDF komt):",
-        key="ra_edited_md",
-        height=350
-    )
-
-    # Altijd de huidige state naar PDF sturen
-    try:
-        pdf_bytes = build_pdf_bytes(
-            title=f"Resultaatgebieden — {role_title.strip() or 'Onbekende functie'}",
-            role_desc=f"Functietitel: {role_title}\n\nOmschrijving: {role_desc}",
-            md_content=st.session_state["ra_edited_md"],  # ← niet 'markdown'
-        )
-        st.download_button(
-            label="📄 Download als PDF",
-            data=pdf_bytes,
-            file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', role_title or 'functie')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-    except Exception as e:
-        st.warning(f"Kon PDF niet genereren: {e}")
-
-
+    # Opgehaalde voorbeelden (tabel) – dit mag binnen 'if submitted:' blijven
     st.markdown("### Opgehaalde voorbeelden (tabel)")
     if examples:
         ex_cols = [
@@ -568,6 +548,33 @@ if submitted:
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
 
+# Toon resultaat + editor + PDF op basis van state (blijft staan bij klikken)
+if "ra_markdown" in st.session_state:
+    st.markdown("### Resultaat")
+    st.markdown(st.session_state["ra_markdown"], unsafe_allow_html=False)
+
+    st.markdown("### Bewerk resultaat (Markdown)")
+    st.text_area(
+        "Pas de tekst aan (dit is wat er in de PDF komt):",
+        key="ra_edited_md",
+        height=350
+    )
+
+    try:
+        pdf_bytes = build_pdf_bytes(
+            title=f"Resultaatgebieden — {st.session_state.get('ra_title') or 'Onbekende functie'}",
+            role_desc=f"Functietitel: {st.session_state.get('ra_title','')}\n\nOmschrijving: {st.session_state.get('ra_role_desc','')}",
+            md_content=st.session_state["ra_edited_md"],  # always the edited text
+        )
+        st.download_button(
+            label="📄 Download als PDF",
+            data=pdf_bytes,
+            file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', st.session_state.get('ra_title') or 'functie')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.warning(f"Kon PDF niet genereren: {e}")
 
 
 
