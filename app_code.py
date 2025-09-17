@@ -525,18 +525,24 @@ if submitted:
     st.markdown(markdown, unsafe_allow_html=False)
 
     st.markdown("### Bewerk resultaat (Markdown)")
+
+    # init alleen de eerste keer
+    if "ra_edited_md" not in st.session_state:
+        st.session_state["ra_edited_md"] = markdown
+
+    # bind de textarea aan state (GEEN value=markdown meer!)
     edited_md = st.text_area(
         "Pas de tekst aan (dit is wat er in de PDF komt):",
-        value=markdown,
+        key="ra_edited_md",
         height=350
     )
 
-    # ↓ Gebruik vanaf hier edited_md i.p.v. markdown
+    # Altijd de huidige state naar PDF sturen
     try:
         pdf_bytes = build_pdf_bytes(
             title=f"Resultaatgebieden — {role_title.strip() or 'Onbekende functie'}",
             role_desc=f"Functietitel: {role_title}\n\nOmschrijving: {role_desc}",
-            md_content=edited_md,  # <— belangrijk
+            md_content=st.session_state["ra_edited_md"],  # ← niet 'markdown'
         )
         st.download_button(
             label="📄 Download als PDF",
@@ -561,6 +567,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
