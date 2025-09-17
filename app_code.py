@@ -481,9 +481,10 @@ with st.form("ra_form"):
     # Single-select dropdowns
     ORG_TYPES = ["(alle)", "profit", "nonprofit"]
     SECTORS   = ["(alle)",
-        "healthcare", "education", "government", "finance", "tech",
-        "manufacturing", "retail", "logistics", "energy", "nonprofit/ngo"
+        "Tech/IT", "Vastgoed", "Zorg & Welzijn", "Onderwijs", "Overheid", "Retail & Horeca", "Energie & Duuzaamheid", "Landbouw & Voeding",
+        "Industrie & Productie", "Logistiek & Transport", "Financiele Dienstverlening", "Bouw & Installatie", "Zakelijke Dienstverlening"
     ]
+    
     org_type_choice = st.selectbox("Organisatietype", ORG_TYPES, index=0)
     sector_choice   = st.selectbox("Sector", SECTORS, index=0)
 
@@ -552,6 +553,7 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
 
 
 
