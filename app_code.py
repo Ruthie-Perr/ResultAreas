@@ -216,6 +216,12 @@ DOEL EN SPELREGELS (ENKEL HIER, BRON VAN WAARHEID):
   - Neem opgegeven **sector** en **organisatietype** expliciet mee in formulering en clustering.
   - Gebruik **voorbeelden** alleen ter inspiratie/bias; kopieer niet letterlijk.
 - Output is **strikt JSON** conform het schema hieronder (geen extra tekst).
+- Kies thema’s die de **kern van de functiecontext** weerspiegelen. 
+  Vermijd thema’s die duidelijk niet relevant zijn (bijvoorbeeld: geen HR-processen kiezen 
+  tenzij de functieomschrijving expliciet over HR gaat).
+- Voor uitvoerende of technische functies met veel vakkennis of analytische taken 
+  moet het thema **Specialistisch werk** expliciet overwogen worden.
+
 
 ALLOWED_THEMES (met exact te gebruiken A/E/M):
 {allowed_block}
@@ -525,7 +531,7 @@ if submitted:
             md_content=markdown,
         )
         st.download_button(
-            label="📄 Download als PDF",
+            label="📄 Download PDF",
             data=pdf_bytes,
             file_name=f"resultaatgebieden_{re.sub(r'[^a-zA-Z0-9_-]+','_', role_title or 'functie')}.pdf",
             mime="application/pdf",
@@ -546,3 +552,4 @@ if submitted:
         st.dataframe(ex_df, use_container_width=True, hide_index=True)
     else:
         st.info("Geen voorbeelden gevonden voor deze selectie.")
+
