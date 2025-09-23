@@ -477,8 +477,7 @@ with st.form("ra_form"):
         height=180,
         placeholder="Beschrijf kort de scope, taken en verantwoordelijkheden…"
     )
-    k = st.number_input("Aantal voorbeelden (k)", min_value=2, max_value=10, value=4)
-
+    k = 3
     # Single-select dropdowns
     ORG_TYPES = ["(alle)", "profit", "nonprofit"]
     SECTORS   = ["(alle)",
@@ -583,6 +582,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
