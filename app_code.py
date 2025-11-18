@@ -157,7 +157,7 @@ HOW_TO_RA_NL = """Resultaatgebieden:
 THEMES_ALLOWED: List[Dict[str, str]] = [
     # Strategisch (Beleidsmakers)
     {"name": "Stakeholder alignment", "A": "75-100", "E": "25-50", "M": "75-100", "level": "Strategisch"},
-    {"name": "Governance & Cultuur", "A": "75-100", "E": "0-25", "M": "65-100", "level": "Strategisch"},
+    {"name": "Governance & Cultuur", "A": "75-100", "E": "0-25", "M": "75-100", "level": "Strategisch"},
     {"name": "Netwerkvorming & Partnerships", "A": "75-100", "E": "75-100", "M": "75-100", "level": "Strategisch"},
     {"name": "Markt- en Trendontwikkeling", "A": "50-75", "E": "75-100", "M": "75-100", "level": "Strategisch"},
     {"name": "Beleidsplanning & Control", "A": "0-25", "E": "0-25", "M": "75-100", "level": "Strategisch"},
@@ -582,6 +582,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
