@@ -9,10 +9,6 @@ except ImportError:
     pass
 
 
-import streamlit as st     # must come before st.write()
-import chromadb
-
-st.write("Chroma version on Streamlit Cloud:", chromadb.__version__)
 
 
 import os, re, json
@@ -589,6 +585,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
