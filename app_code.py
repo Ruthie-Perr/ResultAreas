@@ -1,6 +1,11 @@
 # app.py — Result Areas Generator (LLM generates result areas first; then assigns themes)
 
 # --- SQLite shim for Streamlit Cloud (Chromadb requires sqlite >= 3.35) ---
+import chromadb
+st.write("Chroma version on Streamlit Cloud:", chromadb.__version__)
+
+
+
 import sys
 try:
     import pysqlite3
@@ -582,6 +587,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
