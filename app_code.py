@@ -64,7 +64,7 @@ EXCEL_FILE = "Resultaatgebieden Excel.xlsx"
 def rebuild_chroma_if_needed():
     """Rebuild Chroma DB if folder is missing. Safe, idempotent, Excel-driven."""
     if not os.path.exists(PERSIST_DIR):
-        st.warning("⚠️ Chroma DB ontbreekt — opnieuw aan het opbouwen vanuit Excel…")
+        ##st.warning("⚠️ Chroma DB ontbreekt — opnieuw aan het opbouwen vanuit Excel…")
 
         df = pd.read_excel(EXCEL_FILE)
 
@@ -641,6 +641,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
