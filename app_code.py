@@ -59,7 +59,7 @@ show_header()
 # ── AUTO-REBUILD CHROMA DB IF MISSING ───────────────────────────────
 from langchain.schema import Document
 
-EXCEL_FILE = "kb_data.xlsx"
+EXCEL_FILE = "Resultaatgebieden Excel.xlsx"
 
 def rebuild_chroma_if_needed():
     """Rebuild Chroma DB if folder is missing. Safe, idempotent, Excel-driven."""
@@ -641,6 +641,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
