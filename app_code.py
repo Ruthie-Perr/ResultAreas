@@ -56,15 +56,71 @@ def show_header():
 
 show_header()
 
-# ── Vectorstore laden ─────────────────────────────────────────────────
-@st.cache_resource
-def load_vs() -> Chroma:
+# ── AUTO-REBUILD CHROMA DB IF MISSING ───────────────────────────────
+from langchain.schema import Document
+
+EXCEL_FILE = "kb_data.xlsx"
+
+def rebuild_chroma_if_needed():
+    """Rebuild Chroma DB if folder is missing. Safe, idempotent, Excel-driven."""
+    if not os.path.exists(PERSIST_DIR):
+        st.warning("⚠️ Chroma DB ontbreekt — opnieuw aan het opbouwen vanuit Excel…")
+
+        df = pd.read_excel(EXCEL_FILE)
+
+        emb = OpenAIEmbeddings(model=EMBED_MODEL)
+        vs = Chroma(
+            persist_directory=PERSIST_DIR,
+            collection_name=COLLECTION_NAME,
+            embedding_function=emb,
+        )
+
+        docs = []
+        for _, row in df.iterrows():
+            # embedding text (used for semantic retrieval)
+            text = f"{row.get('Functietitel','')} — {row.get('Resultaatgebied','')}"
+
+            # metadata mapped from your actual Excel columns
+            metadata = {
+                "function_title": row.get("Functietitel", ""),
+                "theme": row.get("Thema", ""),
+                "result_area": row.get("Resultaatgebied", ""),
+
+                # AEM-cube scores from Excel
+                "band_attachment": row.get("Attachment", ""),
+                "band_exploration": row.get("Exploratie", ""),
+                "band_managing_complexity": row.get("Managen van Complexiteit", ""),
+
+                # Always include: the LLM filters expect these keys even if empty
+                "org_type": "",
+                "sector": "",
+                "source": "excel_import",
+                "app_scope": "result_areas",
+                "content_type": "example",
+            }
+
+            docs.append(Document(page_content=text, metadata=metadata))
+
+        vs.add_documents(docs)
+        vs.persist()
+
+        st.success("✅ Chroma DB opnieuw opgebouwd.")
+
+    # return a working vectorstore (either existing or rebuilt)
     emb = OpenAIEmbeddings(model=EMBED_MODEL)
     return Chroma(
         persist_directory=PERSIST_DIR,
-        embedding_function=emb,
         collection_name=COLLECTION_NAME,
+        embedding_function=emb,
     )
+
+
+# ── Vectorstore laden ─────────────────────────────────────────────────
+@st.cache_resource
+
+def load_vs() -> Chroma:
+    return rebuild_chroma_if_needed()
+
 
 try:
     vs = load_vs()
@@ -585,6 +641,7 @@ if "ra_markdown" in st.session_state:
         use_container_width=True,
         key=pdf_key,
     )
+
 
 
 
